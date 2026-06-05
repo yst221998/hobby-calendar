@@ -1,0 +1,268 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+}
+
+/* Header */
+.header {
+  border-bottom: 1px solid var(--paper-2);
+  background: var(--paper);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.headerInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logoMark {
+  color: var(--gold);
+  font-size: 18px;
+}
+
+.logoText {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.resetBtn {
+  font-size: 14px;
+  color: var(--ink-2);
+  background: none;
+  border: 1.5px solid var(--paper-3);
+  border-radius: 100px;
+  padding: 7px 16px;
+  transition: all 0.15s;
+}
+
+.resetBtn:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+
+/* Main */
+.main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+/* Input step */
+.inputSection {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hero { margin-bottom: 8px; }
+
+.heroEyebrow {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.heroTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.heroSub {
+  font-size: 16px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  max-width: 500px;
+}
+
+.card {
+  background: white;
+  border: 1px solid var(--paper-2);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+
+.error {
+  font-size: 14px;
+  color: var(--coral);
+  background: var(--coral-light);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+}
+
+.findBtn {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: var(--radius);
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+  align-self: flex-start;
+}
+
+.findBtn:hover:not(:disabled) {
+  background: var(--gold);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.findBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* Loading */
+.loadingSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 20px;
+}
+
+.loadingSpinner {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinnerRing {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--paper-3);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinnerIcon {
+  color: var(--gold);
+  font-size: 20px;
+}
+
+.loadingMsg {
+  font-size: 16px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.loadingTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.loadingTag {
+  font-size: 13px;
+  padding: 4px 12px;
+  background: var(--gold-light);
+  color: #7a5510;
+  border-radius: 100px;
+}
+
+/* Calendar */
+.calendarSection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.calendarTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.calendarSub {
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legendDot {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 100px;
+}
+
+.dot0 { background: var(--purple-light); color: var(--purple); }
+.dot1 { background: var(--teal-light); color: var(--teal); }
+.dot2 { background: var(--coral-light); color: var(--coral); }
+.dot3 { background: var(--gold-light); color: #7a5510; }
+
+.calHint {
+  font-size: 13px;
+  color: var(--ink-3);
+  text-align: center;
+  padding-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .main { padding: 24px 16px 60px; }
+  .heroTitle { font-size: 28px; }
+  .calendarHeader { flex-direction: column; }
+}

@@ -1,0 +1,84 @@
+import styles from './Calendar.module.css'
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+const HOBBY_COLORS = {
+  'Music': 'purple',
+  'Art & Craft': 'coral',
+  'Photography': 'teal',
+  'Fitness': 'gold',
+  'Comedy': 'purple',
+  'Theatre': 'coral',
+  'Food & Dining': 'gold',
+  'Dance': 'purple',
+  'Hiking': 'teal',
+  'Wellness': 'teal',
+  'Tech & Gaming': 'teal',
+  'Books & Literature': 'coral',
+  'Cinema': 'purple',
+  'Wine & Cocktails': 'gold',
+  'Yoga': 'teal',
+  'Stand-up Comedy': 'purple',
+}
+
+function getColor(hobby) {
+  return HOBBY_COLORS[hobby] || 'gold'
+}
+
+export default function Calendar({ events, month, year, onMonthChange, onEventClick }) {
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const today = new Date()
+
+  const eventsByDay = {}
+  events.forEach(e => {
+    if (!eventsByDay[e.day]) eventsByDay[e.day] = []
+    eventsByDay[e.day].push(e)
+  })
+
+  const cells = []
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  return (
+    <div className={styles.wrapper}>
+      <div className={styles.nav}>
+        <button className={styles.navBtn} onClick={() => onMonthChange(-1)}>←</button>
+        <span className={styles.monthTitle}>{MONTHS[month]} {year}</span>
+        <button className={styles.navBtn} onClick={() => onMonthChange(1)}>→</button>
+      </div>
+
+      <div className={styles.dayLabels}>
+        {DAYS.map(d => <div key={d} className={styles.dayLabel}>{d}</div>)}
+      </div>
+
+      <div className={styles.grid}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`empty-${i}`} className={styles.emptyCell} />
+          const dayEvents = eventsByDay[day] || []
+          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+          return (
+            <div key={day} className={`${styles.cell} ${dayEvents.length ? styles.hasEvents : ''} ${isToday ? styles.today : ''}`}>
+              <div className={styles.dateNum}>{day}</div>
+              {dayEvents.slice(0, 2).map((ev, ei) => (
+                <button
+                  key={ei}
+                  className={`${styles.eventPill} ${styles[getColor(ev.hobby)]}`}
+                  onClick={() => onEventClick(ev)}
+                >
+                  {ev.name.length > 20 ? ev.name.slice(0, 18) + '…' : ev.name}
+                </button>
+              ))}
+              {dayEvents.length > 2 && (
+                <button className={styles.moreBtn} onClick={() => onEventClick(dayEvents[2])}>
+                  +{dayEvents.length - 2} more
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
