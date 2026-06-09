@@ -26,7 +26,7 @@ function getColor(hobby) {
   return HOBBY_COLORS[hobby] || 'gold'
 }
 
-export default function Calendar({ events, month, year, onMonthChange, onEventClick }) {
+export default function Calendar({ events, month, year, onMonthChange, onEventClick, onMoreClick }) {
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const today = new Date()
@@ -71,7 +71,7 @@ export default function Calendar({ events, month, year, onMonthChange, onEventCl
                 </button>
               ))}
               {dayEvents.length > 2 && (
-                <button className={styles.moreBtn} onClick={() => onEventClick(dayEvents[2])}>
+                <button className={styles.moreBtn} onClick={() => onMoreClick(dayEvents)}>
                   +{dayEvents.length - 2} more
                 </button>
               )}

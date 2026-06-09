@@ -3,6 +3,7 @@ import Head from 'next/head'
 import HobbyPicker from '../components/HobbyPicker'
 import Calendar from '../components/Calendar'
 import EventModal from '../components/EventModal'
+import DayEventsModal from '../components/DayEventsModal'
 import styles from './index.module.css'
 
 const STEPS = { INPUT: 'input', LOADING: 'loading', CALENDAR: 'calendar' }
@@ -15,6 +16,7 @@ export default function Home() {
   const [eventCache, setEventCache] = useState({})
   const [events, setEvents] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [dayEvents, setDayEvents] = useState(null) // for "more" modal
   const [month, setMonth] = useState(new Date().getMonth())
   const [year, setYear] = useState(new Date().getFullYear())
   const [error, setError] = useState('')
@@ -204,6 +206,7 @@ export default function Home() {
                   year={year}
                   onMonthChange={handleMonthChange}
                   onEventClick={setSelectedEvent}
+                  onMoreClick={(evs) => setDayEvents(evs)}
                 />
               )}
 
@@ -213,6 +216,14 @@ export default function Home() {
         </main>
 
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        <DayEventsModal
+          events={dayEvents}
+          day={dayEvents?.[0] ? dayEvents[0].day : null}
+          month={month}
+          year={year}
+          onClose={() => setDayEvents(null)}
+          onEventClick={setSelectedEvent}
+        />
       </div>
     </>
   )
