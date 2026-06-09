@@ -254,6 +254,17 @@
 .dot2 { background: var(--coral-light); color: var(--coral); }
 .dot3 { background: var(--gold-light); color: #7a5510; }
 
+.monthLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 300px;
+  color: var(--ink-3);
+  font-size: 15px;
+}
+
 .calHint {
   font-size: 13px;
   color: var(--ink-3);

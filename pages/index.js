@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Head from 'next/head'
 import HobbyPicker from '../components/HobbyPicker'
 import Calendar from '../components/Calendar'
@@ -11,12 +11,15 @@ export default function Home() {
   const [step, setStep] = useState(STEPS.INPUT)
   const [hobbies, setHobbies] = useState([])
   const [location, setLocation] = useState('')
+  // eventCache stores events per "month-year" key so we don't re-fetch the same month twice
+  const [eventCache, setEventCache] = useState({})
   const [events, setEvents] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [month, setMonth] = useState(new Date().getMonth())
   const [year, setYear] = useState(new Date().getFullYear())
   const [error, setError] = useState('')
   const [loadingMsg, setLoadingMsg] = useState('')
+  const [monthLoading, setMonthLoading] = useState(false)
 
   const LOADING_MSGS = [
     'Scanning events across Mumbai…',
@@ -24,6 +27,21 @@ export default function Home() {
     'Asking our AI to fill in the gaps…',
     'Polishing your calendar…',
   ]
+
+  const fetchEvents = useCallback(async (m, y, currentHobbies, currentLocation, cache) => {
+    const cacheKey = `${m}-${y}`
+    // Return cached events if we already fetched this month
+    if (cache[cacheKey]) return { events: cache[cacheKey], fromCache: true }
+
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hobbies: currentHobbies, city: currentLocation || 'Mumbai', month: m, year: y }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    return { events: data.events || [], fromCache: false }
+  }, [])
 
   const handleFind = async () => {
     if (hobbies.length === 0) { setError('Please pick at least one hobby.'); return }
@@ -38,30 +56,46 @@ export default function Home() {
     }, 1500)
 
     try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hobbies, city: location || 'Mumbai', month, year }),
-      })
-      const data = await res.json()
+      const cacheKey = `${month}-${year}`
+      const result = await fetchEvents(month, year, hobbies, location, {})
       clearInterval(interval)
-      if (data.error) { setError(data.error); setStep(STEPS.INPUT); return }
-      setEvents(data.events || [])
+      const newCache = { [cacheKey]: result.events }
+      setEventCache(newCache)
+      setEvents(result.events)
       setStep(STEPS.CALENDAR)
     } catch (e) {
       clearInterval(interval)
-      setError('Something went wrong. Check your API keys in .env.local')
+      setError(e.message || 'Something went wrong. Check your API keys in .env.local')
       setStep(STEPS.INPUT)
     }
   }
 
-  const handleMonthChange = (dir) => {
+  const handleMonthChange = async (dir) => {
     let m = month + dir
     let y = year
     if (m > 11) { m = 0; y++ }
     if (m < 0) { m = 11; y-- }
     setMonth(m)
     setYear(y)
+
+    const cacheKey = `${m}-${y}`
+    // If cached, just show instantly
+    if (eventCache[cacheKey]) {
+      setEvents(eventCache[cacheKey])
+      return
+    }
+
+    // Otherwise fetch fresh events for the new month
+    setMonthLoading(true)
+    try {
+      const result = await fetchEvents(m, y, hobbies, location, eventCache)
+      setEventCache(prev => ({ ...prev, [cacheKey]: result.events }))
+      setEvents(result.events)
+    } catch (e) {
+      console.error('Failed to fetch events for new month', e)
+    } finally {
+      setMonthLoading(false)
+    }
   }
 
   return (
@@ -158,15 +192,22 @@ export default function Home() {
                 </div>
               </div>
 
-              <Calendar
-                events={events}
-                month={month}
-                year={year}
-                onMonthChange={handleMonthChange}
-                onEventClick={setSelectedEvent}
-              />
+              {monthLoading ? (
+                <div className={styles.monthLoading}>
+                  <div className={styles.spinnerRing}></div>
+                  <p>Fetching events for this month…</p>
+                </div>
+              ) : (
+                <Calendar
+                  events={events}
+                  month={month}
+                  year={year}
+                  onMonthChange={handleMonthChange}
+                  onEventClick={setSelectedEvent}
+                />
+              )}
 
-              <p className={styles.calHint}>Tap any event to see details and booking links</p>
+              <p className={styles.calHint}>Tap any event to see details and booking links · Each month fetches fresh events</p>
             </div>
           )}
         </main>
