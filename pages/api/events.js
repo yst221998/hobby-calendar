@@ -1,4 +1,4 @@
-import { fetchRealEvents, generateAIEvents } from "../../lib/events";
+import { fetchRealEvents } from "../../lib/events";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -10,21 +10,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Try real events first
-    let events = await fetchRealEvents(hobbies, city, month, year);
-
-    // Always supplement with AI events
-    const aiEvents = await generateAIEvents(hobbies, city, month, year, events.length);
-    events = [...events, ...aiEvents];
-
-    // Deduplicate by day (prefer real over AI)
-    const byDay = {};
-    events.forEach((e) => {
-      if (!byDay[e.day]) byDay[e.day] = [];
-      byDay[e.day].push(e);
+    const events = await fetchRealEvents(hobbies, city, month, year);
+    return res.status(200).json({
+      events,
+      total: events.length,
+      message: events.length === 0
+        ? "No events found with direct booking links for this month. Try different hobbies or check back later."
+        : null
     });
-
-    return res.status(200).json({ events, total: events.length });
   } catch (err) {
     console.error("Events API error:", err);
     return res.status(500).json({ error: "Failed to fetch events. Check your API keys." });

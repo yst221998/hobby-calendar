@@ -62,7 +62,7 @@ export default function Home() {
       const result = await fetchEvents(month, year, hobbies, location, {})
       clearInterval(interval)
       const newCache = { [cacheKey]: result.events }
-      setEventCache(newCache)
+      setEventCache(newCache) // fresh cache — wipes any previous search
       setEvents(result.events)
       setStep(STEPS.CALENDAR)
     } catch (e) {
@@ -199,6 +199,13 @@ export default function Home() {
                   <div className={styles.spinnerRing}></div>
                   <p>Fetching events for this month…</p>
                 </div>
+              ) : events.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <p className={styles.emptyIcon}>🔍</p>
+                  <h3>No bookable events found this month</h3>
+                  <p>We only show events with direct booking links. Try switching to a different month or adjusting your hobbies.</p>
+                  <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]); setEventCache({}) }}>Try different hobbies</button>
+                </div>
               ) : (
                 <Calendar
                   events={events}
@@ -210,7 +217,7 @@ export default function Home() {
                 />
               )}
 
-              <p className={styles.calHint}>Tap any event to see details and booking links · Each month fetches fresh events</p>
+              {events.length > 0 && <p className={styles.calHint}>Tap any event · Links open the exact booking page</p>}
             </div>
           )}
         </main>

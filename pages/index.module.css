@@ -254,6 +254,30 @@
 .dot2 { background: var(--coral-light); color: var(--coral); }
 .dot3 { background: var(--gold-light); color: #7a5510; }
 
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.emptyIcon { font-size: 40px; }
+
+.emptyState h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.emptyState p {
+  font-size: 14px;
+  color: var(--ink-3);
+  max-width: 340px;
+  line-height: 1.6;
+}
+
 .monthLoading {
   display: flex;
   flex-direction: column;
