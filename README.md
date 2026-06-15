@@ -35,7 +35,8 @@ Discover bookable events in Mumbai based on your hobbies. Events are sourced fro
 ## How events work
 
 - Pick hobbies and optionally your Mumbai neighbourhood.
-- The app searches `site:in.bookmyshow.com` and `site:district.in` for matching events.
+- The app searches BookMyShow and District for matching **individual event pages** (not venue or category listings).
+- Listing pages, generic titles, and non-Mumbai cities are filtered out automatically.
 - Events with a confirmed date appear on the calendar grid.
 - Events without a parseable date appear under **Dates TBD this month** (never on random days).
 - Deep-link event pages may be fetched to extract dates from JSON-LD metadata.

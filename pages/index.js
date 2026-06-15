@@ -213,7 +213,7 @@ export default function Home() {
                 <div className={styles.emptyState}>
                   <p className={styles.emptyIcon}>🔍</p>
                   <h3>No events found this month</h3>
-                  <p>We search BookMyShow and District for your hobbies. Try a different month or adjust your interests.</p>
+                  <p>We only show specific bookable events on BookMyShow and District — venue listings, category pages, and other cities are filtered out. Try a different month or adjust your interests.</p>
                   <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]); setEventCache({}) }}>Try different hobbies</button>
                 </div>
               ) : (
@@ -265,7 +265,7 @@ export default function Home() {
               )}
 
               {events.length > 0 && (
-                <p className={styles.calHint}>Tap any event · Links open BookMyShow or District</p>
+                <p className={styles.calHint}>Each event opens its BookMyShow or District booking page</p>
               )}
             </div>
           )}
