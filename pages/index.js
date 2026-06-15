@@ -26,6 +26,14 @@ export default function Home() {
 
   const scheduledEvents = useMemo(() => events.filter(e => e.day !== null), [events])
   const unscheduledEvents = useMemo(() => events.filter(e => e.day === null), [events])
+  const uniqueEventCount = useMemo(() => {
+    const links = new Set()
+    events.forEach(e => {
+      const link = e.bookingLinks ? Object.values(e.bookingLinks)[0] : ''
+      if (link) links.add(link)
+    })
+    return links.size
+  }, [events])
 
   const LOADING_MSGS = [
     'Searching BookMyShow & District…',
@@ -187,7 +195,7 @@ export default function Home() {
                 <div>
                   <h2 className={styles.calendarTitle}>Your events calendar</h2>
                   <p className={styles.calendarSub}>
-                    {events.length} events · {scheduledEvents.length} dated · {hobbies.join(', ')} · {location || 'Mumbai'}
+                    {scheduledEvents.length} showings · {uniqueEventCount} events · {hobbies.join(', ')} · {location || 'Mumbai'}
                   </p>
                   {eventSources.length > 0 && (
                     <p className={styles.sourcesList}>From: {eventSources.join(' · ')}</p>
@@ -242,7 +250,7 @@ export default function Home() {
                   {unscheduledEvents.length > 0 && (
                     <section className={styles.tbdSection}>
                       <h3 className={styles.tbdTitle}>Dates TBD this month</h3>
-                      <p className={styles.tbdSub}>{unscheduledEvents.length} event{unscheduledEvents.length !== 1 ? 's' : ''} without a confirmed date</p>
+                      <p className={styles.tbdSub}>{unscheduledEvents.length} valid event page{unscheduledEvents.length !== 1 ? 's' : ''} without a confirmed date this month</p>
                       <div className={styles.tbdList}>
                         {unscheduledEvents.map((ev, i) => (
                           <button
