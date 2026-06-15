@@ -1,4 +1,4 @@
-import { refreshAllCaches } from "../../lib/cache";
+import { refreshAllCaches } from "../../../lib/cache";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
