@@ -2,13 +2,7 @@ import styles from './EventModal.module.css'
 
 const PLATFORM_ICONS = {
   'BookMyShow': '🎟️',
-  'Insider.in': '⭐',
   'District': '🏙️',
-  'Dineout': '🍽️',
-  'Cult.fit': '🏃',
-  'Google Events': '🔍',
-  'Paytm': '💳',
-  'Meetup': '👥',
 }
 
 export default function EventModal({ event, onClose }) {
@@ -21,7 +15,8 @@ export default function EventModal({ event, onClose }) {
 
         <div className={styles.header}>
           {event.source === 'real' && <span className={styles.realBadge}>Live Event</span>}
-          {event.source === 'ai' && <span className={styles.aiBadge}>AI Suggested</span>}
+          {event.source === 'partial' && <span className={styles.browseBadge}>Browse on platform</span>}
+          {event.day === null && <span className={styles.tbdBadge}>Date TBD</span>}
           <h2 className={styles.title}>{event.name}</h2>
           <div className={styles.meta}>
             <span>📍 {event.venue}</span>

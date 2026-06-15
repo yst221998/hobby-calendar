@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Head from 'next/head'
 import HobbyPicker from '../components/HobbyPicker'
 import Calendar from '../components/Calendar'
@@ -12,27 +12,30 @@ export default function Home() {
   const [step, setStep] = useState(STEPS.INPUT)
   const [hobbies, setHobbies] = useState([])
   const [location, setLocation] = useState('')
-  // eventCache stores events per "month-year" key so we don't re-fetch the same month twice
   const [eventCache, setEventCache] = useState({})
   const [events, setEvents] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [dayEvents, setDayEvents] = useState(null) // for "more" modal
+  const [dayEvents, setDayEvents] = useState(null)
   const [month, setMonth] = useState(new Date().getMonth())
   const [year, setYear] = useState(new Date().getFullYear())
   const [error, setError] = useState('')
+  const [monthError, setMonthError] = useState('')
   const [loadingMsg, setLoadingMsg] = useState('')
   const [eventSources, setEventSources] = useState([])
+  const [monthLoading, setMonthLoading] = useState(false)
+
+  const scheduledEvents = useMemo(() => events.filter(e => e.day !== null), [events])
+  const unscheduledEvents = useMemo(() => events.filter(e => e.day === null), [events])
 
   const LOADING_MSGS = [
-    'Scanning events across Mumbai…',
-    'Matching your interests on BookMyShow & Insider…',
-    'Asking our AI to fill in the gaps…',
-    'Polishing your calendar…',
+    'Searching BookMyShow & District…',
+    'Matching your interests in Mumbai…',
+    'Pulling booking links…',
+    'Building your calendar…',
   ]
 
   const fetchEvents = useCallback(async (m, y, currentHobbies, currentLocation, cache) => {
     const cacheKey = `${m}-${y}`
-    // Return cached events if we already fetched this month
     if (cache[cacheKey]) return { events: cache[cacheKey], fromCache: true }
 
     const res = await fetch('/api/events', {
@@ -48,6 +51,7 @@ export default function Home() {
   const handleFind = async () => {
     if (hobbies.length === 0) { setError('Please pick at least one hobby.'); return }
     setError('')
+    setMonthError('')
     setStep(STEPS.LOADING)
 
     let msgIndex = 0
@@ -64,11 +68,11 @@ export default function Home() {
       const newCache = { [cacheKey]: result.events }
       setEventCache(newCache)
       setEvents(result.events)
-      setEventSources(result.sources || [])
+      setEventSources(['BookMyShow', 'District'])
       setStep(STEPS.CALENDAR)
     } catch (e) {
       clearInterval(interval)
-      setError(e.message || 'Something went wrong. Check your API keys in .env.local')
+      setError(e.message || 'Something went wrong. Check SERPAPI_KEY in .env.local')
       setStep(STEPS.INPUT)
     }
   }
@@ -80,23 +84,22 @@ export default function Home() {
     if (m < 0) { m = 11; y-- }
     setMonth(m)
     setYear(y)
+    setMonthError('')
 
     const cacheKey = `${m}-${y}`
-    // If cached, just show instantly
     if (eventCache[cacheKey]) {
       setEvents(eventCache[cacheKey])
       return
     }
 
-    // Otherwise fetch fresh events for the new month
     setMonthLoading(true)
     try {
       const result = await fetchEvents(m, y, hobbies, location, eventCache)
       setEventCache(prev => ({ ...prev, [cacheKey]: result.events }))
       setEvents(result.events)
-      if (result.sources) setEventSources(result.sources)
+      setEventSources(['BookMyShow', 'District'])
     } catch (e) {
-      console.error('Failed to fetch events for new month', e)
+      setMonthError(e.message || 'Failed to load events for this month.')
     } finally {
       setMonthLoading(false)
     }
@@ -111,7 +114,6 @@ export default function Home() {
       </Head>
 
       <div className={styles.page}>
-        {/* Header */}
         <header className={styles.header}>
           <div className={styles.headerInner}>
             <div className={styles.logo}>
@@ -128,13 +130,12 @@ export default function Home() {
 
         <main className={styles.main}>
 
-          {/* STEP 1: Input */}
           {step === STEPS.INPUT && (
             <div className={styles.inputSection}>
               <div className={styles.hero}>
                 <p className={styles.heroEyebrow}>Mumbai · Events · Just for you</p>
                 <h1 className={styles.heroTitle}>What do you love doing?</h1>
-                <p className={styles.heroSub}>Pick your interests and we'll fill your calendar with events, workshops, and experiences — all bookable in one tap.</p>
+                <p className={styles.heroSub}>Pick your interests and we&apos;ll fill your calendar with bookable events from BookMyShow and District.</p>
               </div>
 
               <div className={styles.card}>
@@ -163,11 +164,10 @@ export default function Home() {
                 Build my calendar →
               </button>
 
-              <p className={styles.hint}>Powered by Google Events + AI · Links open BookMyShow, Insider.in & District</p>
+              <p className={styles.hint}>Powered by BookMyShow &amp; District via SerpAPI</p>
             </div>
           )}
 
-          {/* STEP 2: Loading */}
           {step === STEPS.LOADING && (
             <div className={styles.loadingSection}>
               <div className={styles.loadingSpinner}>
@@ -181,13 +181,14 @@ export default function Home() {
             </div>
           )}
 
-          {/* STEP 3: Calendar */}
           {step === STEPS.CALENDAR && (
             <div className={styles.calendarSection}>
               <div className={styles.calendarHeader}>
                 <div>
                   <h2 className={styles.calendarTitle}>Your events calendar</h2>
-                  <p className={styles.calendarSub}>{events.length} events · {hobbies.join(', ')} · {location || 'Mumbai'}</p>
+                  <p className={styles.calendarSub}>
+                    {events.length} events · {scheduledEvents.length} dated · {hobbies.join(', ')} · {location || 'Mumbai'}
+                  </p>
                   {eventSources.length > 0 && (
                     <p className={styles.sourcesList}>From: {eventSources.join(' · ')}</p>
                   )}
@@ -199,6 +200,10 @@ export default function Home() {
                 </div>
               </div>
 
+              {monthError && (
+                <p className={styles.error}>{monthError}</p>
+              )}
+
               {monthLoading ? (
                 <div className={styles.monthLoading}>
                   <div className={styles.spinnerRing}></div>
@@ -207,22 +212,61 @@ export default function Home() {
               ) : events.length === 0 ? (
                 <div className={styles.emptyState}>
                   <p className={styles.emptyIcon}>🔍</p>
-                  <h3>No bookable events found this month</h3>
-                  <p>We only show events with direct booking links. Try switching to a different month or adjusting your hobbies.</p>
+                  <h3>No events found this month</h3>
+                  <p>We search BookMyShow and District for your hobbies. Try a different month or adjust your interests.</p>
                   <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]); setEventCache({}) }}>Try different hobbies</button>
                 </div>
               ) : (
-                <Calendar
-                  events={events}
-                  month={month}
-                  year={year}
-                  onMonthChange={handleMonthChange}
-                  onEventClick={setSelectedEvent}
-                  onMoreClick={(evs) => setDayEvents(evs)}
-                />
+                <>
+                  {scheduledEvents.length > 0 && (
+                    <Calendar
+                      events={scheduledEvents}
+                      month={month}
+                      year={year}
+                      onMonthChange={handleMonthChange}
+                      onEventClick={setSelectedEvent}
+                      onMoreClick={(evs) => setDayEvents(evs)}
+                    />
+                  )}
+
+                  {scheduledEvents.length === 0 && unscheduledEvents.length > 0 && (
+                    <div className={styles.noDatedNotice}>
+                      <p>No dated events this month — see listings below with dates TBD.</p>
+                      <div className={styles.monthNavOnly}>
+                        <button className={styles.navBtn} onClick={() => handleMonthChange(-1)}>← Prev month</button>
+                        <button className={styles.navBtn} onClick={() => handleMonthChange(1)}>Next month →</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {unscheduledEvents.length > 0 && (
+                    <section className={styles.tbdSection}>
+                      <h3 className={styles.tbdTitle}>Dates TBD this month</h3>
+                      <p className={styles.tbdSub}>{unscheduledEvents.length} event{unscheduledEvents.length !== 1 ? 's' : ''} without a confirmed date</p>
+                      <div className={styles.tbdList}>
+                        {unscheduledEvents.map((ev, i) => (
+                          <button
+                            key={i}
+                            className={styles.tbdRow}
+                            onClick={() => setSelectedEvent(ev)}
+                          >
+                            <span className={styles.tbdIcon}>{ev.platformIcon || '📅'}</span>
+                            <div className={styles.tbdInfo}>
+                              <p className={styles.tbdName}>{ev.name}</p>
+                              <p className={styles.tbdMeta}>{ev.platforms?.[0]} · {ev.price}</p>
+                            </div>
+                            <span className={styles.tbdArrow}>→</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
               )}
 
-              {events.length > 0 && <p className={styles.calHint}>Tap any event · Links open the exact booking page</p>}
+              {events.length > 0 && (
+                <p className={styles.calHint}>Tap any event · Links open BookMyShow or District</p>
+              )}
             </div>
           )}
         </main>

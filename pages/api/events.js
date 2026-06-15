@@ -9,15 +9,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Please provide at least one hobby" });
   }
 
+  if (!process.env.SERPAPI_KEY) {
+    return res.status(400).json({ error: "SERPAPI_KEY is not set. Add it to .env.local" });
+  }
+
   try {
-    const events = await fetchRealEvents(hobbies, city, month, year);
+    const { events, scheduled, unscheduled } = await fetchRealEvents(hobbies, city, month, year);
     return res.status(200).json({
       events,
+      scheduled,
+      unscheduled,
       total: events.length,
-      sources: [...new Set(events.map((e) => e.platforms[0]))],
+      sources: ["BookMyShow", "District"],
     });
   } catch (err) {
     console.error("Events API error:", err);
-    return res.status(500).json({ error: "Failed to fetch events. Check your API keys." });
+    return res.status(500).json({ error: err.message || "Failed to fetch events. Check your API keys." });
   }
 }

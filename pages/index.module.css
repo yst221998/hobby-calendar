@@ -302,6 +302,107 @@
   padding-top: 4px;
 }
 
+.tbdSection {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--paper-3);
+}
+
+.tbdTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.tbdSub {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+
+.tbdList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tbdRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--paper-3);
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.tbdRow:hover {
+  border-color: var(--gold);
+}
+
+.tbdIcon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.tbdInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.tbdName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tbdMeta {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.tbdArrow {
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.noDatedNotice {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--ink-3);
+  font-size: 14px;
+}
+
+.monthNavOnly {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.navBtn {
+  padding: 8px 16px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: var(--paper-3);
+}
+
 @media (max-width: 600px) {
   .main { padding: 24px 16px 60px; }
   .heroTitle { font-size: 28px; }
