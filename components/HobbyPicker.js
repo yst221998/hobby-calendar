@@ -14,8 +14,9 @@ const PRESET_HOBBIES = [
   { label: 'Wellness', emoji: '🧘' },
   { label: 'Tech & Gaming', emoji: '🎮' },
   { label: 'Books & Literature', emoji: '📚' },
-  { label: 'Cinema', emoji: '🎬' },
+  { label: 'Movies/Cinema', emoji: '🎬' },
   { label: 'Wine & Cocktails', emoji: '🍷' },
+  { label: 'Dating', emoji: '💕' },
   { label: 'Yoga', emoji: '🕉️' },
   { label: 'Stand-up Comedy', emoji: '🎤' },
 ]

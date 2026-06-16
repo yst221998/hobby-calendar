@@ -16,9 +16,11 @@ const HOBBY_COLORS = {
   'Wellness': 'teal',
   'Tech & Gaming': 'teal',
   'Books & Literature': 'coral',
-  'Cinema': 'purple',
+  'Movies/Cinema': 'purple',
+  Cinema: 'purple',
   'Wine & Cocktails': 'gold',
-  'Yoga': 'teal',
+  Dating: 'coral',
+  Yoga: 'teal',
   'Stand-up Comedy': 'purple',
 }
 

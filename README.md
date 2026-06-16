@@ -50,6 +50,16 @@ Without Supabase, the app still works — it fetches live from SerpAPI every tim
 - Each search (hobbies + month + year + city) is stored for **7 days**.
 - Repeat searches within 7 days load from Supabase instantly (no SerpAPI calls).
 - Individual events are stored by URL with their performance dates.
+- Events discovered by one user can be reused for another user searching the same hobbies and month.
+- Empty searches are not cached, so bad zero-result fetches are not preserved for seven days.
+
+### Supported hobbies
+
+The app expands user-facing hobby labels into search aliases so broader interests still find events. Supported presets include:
+
+- Fitness, Movies/Cinema, Wellness, Yoga, Art & Craft, Theatre, Food & Dining, Wine & Cocktails, Dance, Dating, Hiking, Books & Literature, Tech & Gaming, Music, Comedy, Photography
+
+Users can select as many hobbies as they want. The backend caps search terms to avoid excessive SerpAPI usage while still covering all selected interests.
 
 ### Date change log
 
