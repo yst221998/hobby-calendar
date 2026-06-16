@@ -80,6 +80,12 @@ curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-app.vercel.app/api
 - Confirmed events with dates appear on the calendar; undated ones appear under **Dates TBD**.
 - Shows with multiple dates in a month appear on multiple calendar days.
 
+## Debugging empty results
+
+To inspect the search pipeline, POST to `/api/events` with `"debug": true` in the body. The response includes counts such as searches run, organic results seen, candidates accepted, and final scheduled/TBD totals.
+
+Empty searches are not written to Supabase cache, so a bad zero-result fetch will not be preserved for seven days.
+
 ## Booking
 
 Tap any event to open its BookMyShow or District booking page in a new tab.

@@ -42,8 +42,13 @@ export default function Home() {
     'Building your calendar…',
   ]
 
+  const buildCacheKey = useCallback((m, y, currentHobbies, currentLocation) => {
+    const sortedHobbies = [...currentHobbies].sort().join('|')
+    return `${m}-${y}-${currentLocation || 'Mumbai'}-${sortedHobbies}`
+  }, [])
+
   const fetchEvents = useCallback(async (m, y, currentHobbies, currentLocation, cache) => {
-    const cacheKey = `${m}-${y}`
+    const cacheKey = buildCacheKey(m, y, currentHobbies, currentLocation)
     if (cache[cacheKey]) return { events: cache[cacheKey], fromCache: true }
 
     const res = await fetch('/api/events', {
@@ -54,7 +59,7 @@ export default function Home() {
     const data = await res.json()
     if (data.error) throw new Error(data.error)
     return { events: data.events || [], fromCache: false }
-  }, [])
+  }, [buildCacheKey])
 
   const handleFind = async () => {
     if (hobbies.length === 0) { setError('Please pick at least one hobby.'); return }
@@ -70,7 +75,7 @@ export default function Home() {
     }, 1500)
 
     try {
-      const cacheKey = `${month}-${year}`
+      const cacheKey = buildCacheKey(month, year, hobbies, location)
       const result = await fetchEvents(month, year, hobbies, location, {})
       clearInterval(interval)
       const newCache = { [cacheKey]: result.events }
@@ -94,7 +99,7 @@ export default function Home() {
     setYear(y)
     setMonthError('')
 
-    const cacheKey = `${m}-${y}`
+    const cacheKey = buildCacheKey(m, y, hobbies, location)
     if (eventCache[cacheKey]) {
       setEvents(eventCache[cacheKey])
       return

@@ -3,7 +3,7 @@ import { getEventsWithCache } from "../../lib/cache";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { hobbies, city = "Mumbai", month, year } = req.body;
+  const { hobbies, city = "Mumbai", month, year, debug: includeDebug = false } = req.body;
 
   if (!hobbies || hobbies.length === 0) {
     return res.status(400).json({ error: "Please provide at least one hobby" });
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { events, scheduled, unscheduled, fromCache, cacheAgeMs } =
+    const { events, scheduled, unscheduled, fromCache, cacheAgeMs, debug } =
       await getEventsWithCache(hobbies, city, month, year);
 
     const payload = {
@@ -28,6 +28,10 @@ export default async function handler(req, res) {
 
     if (fromCache && cacheAgeMs != null) {
       payload.cacheAgeHours = Math.round(cacheAgeMs / (1000 * 60 * 60));
+    }
+
+    if (includeDebug && debug) {
+      payload.debug = debug;
     }
 
     return res.status(200).json(payload);
