@@ -1,0 +1,75 @@
+.panel {
+  background: white;
+  border: 1.5px solid var(--paper-3);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.compact {
+  padding: 12px;
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.input {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1.5px solid var(--paper-3);
+  border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+}
+
+.submitBtn {
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint, .status, .message {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-top: 10px;
+}
+
+.message {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--ink);
+}
+
+.signedIn {
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.signOutBtn {
+  font-size: 13px;
+  color: var(--ink-2);
+  background: none;
+  border: 1.5px solid var(--paper-3);
+  border-radius: 100px;
+  padding: 6px 14px;
+}
+
+.signOutBtn:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+}

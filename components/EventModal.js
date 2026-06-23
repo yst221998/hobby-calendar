@@ -5,7 +5,14 @@ const PLATFORM_ICONS = {
   'District': '🏙️',
 }
 
-export default function EventModal({ event, onClose }) {
+export default function EventModal({
+  event,
+  onClose,
+  isSaved = false,
+  onToggleSave,
+  saveLoading = false,
+  authConfigured = false,
+}) {
   if (!event) return null
 
   return (
@@ -25,6 +32,17 @@ export default function EventModal({ event, onClose }) {
           </div>
           <span className={styles.hobbyTag}>{event.hobby}</span>
         </div>
+
+        {authConfigured && onToggleSave && (
+          <button
+            type="button"
+            className={isSaved ? styles.savedBtn : styles.interestedBtn}
+            onClick={onToggleSave}
+            disabled={saveLoading}
+          >
+            {saveLoading ? 'Saving…' : isSaved ? '✓ Saved' : '★ Interested'}
+          </button>
+        )}
 
         <div className={styles.bookSection}>
           <p className={styles.bookLabel}>Book your spot</p>

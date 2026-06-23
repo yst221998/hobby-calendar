@@ -1,12 +1,23 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import HobbyPicker from '../components/HobbyPicker'
 import Calendar from '../components/Calendar'
 import EventModal from '../components/EventModal'
 import DayEventsModal from '../components/DayEventsModal'
+import AuthPanel from '../components/AuthPanel'
+import SavedEventsPanel from '../components/SavedEventsPanel'
+import { getSupabaseBrowserClient, isBrowserSupabaseConfigured } from '../lib/supabaseClient'
+import { userApiFetch, getEventUrl } from '../lib/userApi'
 import styles from './index.module.css'
 
 const STEPS = { INPUT: 'input', LOADING: 'loading', CALENDAR: 'calendar' }
+
+const LOADING_MSGS = [
+  'Searching BookMyShow & District…',
+  'Matching your interests in Mumbai…',
+  'Pulling booking links…',
+  'Building your calendar…',
+]
 
 export default function Home() {
   const [step, setStep] = useState(STEPS.INPUT)
@@ -24,23 +35,39 @@ export default function Home() {
   const [eventSources, setEventSources] = useState([])
   const [monthLoading, setMonthLoading] = useState(false)
 
+  const [user, setUser] = useState(null)
+  const [accessToken, setAccessToken] = useState(null)
+  const [savedEvents, setSavedEvents] = useState([])
+  const [savedUrlSet, setSavedUrlSet] = useState(new Set())
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showSavedPanel, setShowSavedPanel] = useState(false)
+  const [authMessage, setAuthMessage] = useState('')
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [pendingSaveEvent, setPendingSaveEvent] = useState(null)
+  const authConfigured = isBrowserSupabaseConfigured()
+  const sessionHandledRef = useRef(false)
+  const hobbiesRef = useRef(hobbies)
+  const locationRef = useRef(location)
+  const monthRef = useRef(month)
+  const yearRef = useRef(year)
+  const pendingSaveRef = useRef(pendingSaveEvent)
+
+  useEffect(() => { hobbiesRef.current = hobbies }, [hobbies])
+  useEffect(() => { locationRef.current = location }, [location])
+  useEffect(() => { monthRef.current = month }, [month])
+  useEffect(() => { yearRef.current = year }, [year])
+  useEffect(() => { pendingSaveRef.current = pendingSaveEvent }, [pendingSaveEvent])
+
   const scheduledEvents = useMemo(() => events.filter(e => e.day !== null), [events])
   const unscheduledEvents = useMemo(() => events.filter(e => e.day === null), [events])
   const uniqueEventCount = useMemo(() => {
     const links = new Set()
     events.forEach(e => {
-      const link = e.bookingLinks ? Object.values(e.bookingLinks)[0] : ''
+      const link = getEventUrl(e)
       if (link) links.add(link)
     })
     return links.size
   }, [events])
-
-  const LOADING_MSGS = [
-    'Searching BookMyShow & District…',
-    'Matching your interests in Mumbai…',
-    'Pulling booking links…',
-    'Building your calendar…',
-  ]
 
   const buildCacheKey = useCallback((m, y, currentHobbies, currentLocation) => {
     const sortedHobbies = [...currentHobbies].sort().join('|')
@@ -60,6 +87,219 @@ export default function Home() {
     if (data.error) throw new Error(data.error)
     return { events: data.events || [], fromCache: false }
   }, [buildCacheKey])
+
+  const savePreferences = useCallback(async (token, hobbyList, city, m, y) => {
+    if (!token || hobbyList.length === 0) return
+    try {
+      await userApiFetch('/api/user/preferences', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          hobbies: hobbyList,
+          city: city || 'Mumbai',
+          month: m,
+          year: y,
+        }),
+      })
+    } catch (e) {
+      console.error('Could not save preferences:', e.message)
+    }
+  }, [])
+
+  const loadSavedEvents = useCallback(async (token) => {
+    if (!token) return
+    try {
+      const data = await userApiFetch('/api/user/saved-events', token)
+      setSavedEvents(data.events || [])
+      setSavedUrlSet(new Set(data.savedUrls || []))
+    } catch (e) {
+      console.error('Could not load saved events:', e.message)
+    }
+  }, [])
+
+  const runCalendarLoad = useCallback(async (hobbyList, city, m, y, existingCache = {}) => {
+    if (hobbyList.length === 0) return
+
+    setStep(STEPS.LOADING)
+    let msgIndex = 0
+    setLoadingMsg(LOADING_MSGS[0])
+    const interval = setInterval(() => {
+      msgIndex = Math.min(msgIndex + 1, LOADING_MSGS.length - 1)
+      setLoadingMsg(LOADING_MSGS[msgIndex])
+    }, 1500)
+
+    try {
+      const cacheKey = buildCacheKey(m, y, hobbyList, city)
+      const result = await fetchEvents(m, y, hobbyList, city, existingCache)
+      clearInterval(interval)
+      const newCache = { ...existingCache, [cacheKey]: result.events }
+      setEventCache(newCache)
+      setEvents(result.events)
+      setEventSources(['BookMyShow', 'District'])
+      setStep(STEPS.CALENDAR)
+    } catch (e) {
+      clearInterval(interval)
+      setError(e.message || 'Something went wrong loading your calendar.')
+      setStep(STEPS.INPUT)
+    }
+  }, [buildCacheKey, fetchEvents])
+
+  const applySignedInSession = useCallback(async (session) => {
+    if (!session?.access_token) return
+
+    const token = session.access_token
+    const currentHobbies = hobbiesRef.current
+    const currentLocation = locationRef.current
+    const currentMonth = monthRef.current
+    const currentYear = yearRef.current
+
+    await loadSavedEvents(token)
+
+    if (currentHobbies.length > 0) {
+      await savePreferences(token, currentHobbies, currentLocation || 'Mumbai', currentMonth, currentYear)
+    } else {
+      try {
+        const prefs = await userApiFetch('/api/user/preferences', token)
+        if (prefs.hobbies?.length) {
+          setHobbies(prefs.hobbies)
+          setLocation(prefs.city === 'Mumbai' ? '' : prefs.city || '')
+
+          const m = typeof prefs.defaultMonth === 'number' ? prefs.defaultMonth : currentMonth
+          const y = typeof prefs.defaultYear === 'number' ? prefs.defaultYear : currentYear
+          setMonth(m)
+          setYear(y)
+
+          await runCalendarLoad(prefs.hobbies, prefs.city || 'Mumbai', m, y)
+        }
+      } catch (e) {
+        console.error('Could not load preferences:', e.message)
+      }
+    }
+
+    const pending = pendingSaveRef.current
+    if (pending) {
+      const url = getEventUrl(pending)
+      if (url) {
+        try {
+          await userApiFetch('/api/user/saved-events', token, {
+            method: 'POST',
+            body: JSON.stringify({
+              eventUrl: url,
+              month: currentMonth,
+              year: currentYear,
+              status: 'interested',
+            }),
+          })
+          await loadSavedEvents(token)
+        } catch (e) {
+          console.error('Could not save event after sign-in:', e.message)
+        }
+      }
+      setPendingSaveEvent(null)
+    }
+  }, [loadSavedEvents, savePreferences, runCalendarLoad])
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) return
+
+    let active = true
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!active || !session) return
+      setUser(session.user)
+      setAccessToken(session.access_token)
+      sessionHandledRef.current = true
+      await applySignedInSession(session)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!active) return
+
+      setUser(session?.user ?? null)
+      setAccessToken(session?.access_token ?? null)
+
+      if (session?.access_token) {
+        setShowAuthModal(false)
+        if (event === 'SIGNED_IN' && !sessionHandledRef.current) {
+          sessionHandledRef.current = true
+          await applySignedInSession(session)
+        } else if (event === 'TOKEN_REFRESHED') {
+          await loadSavedEvents(session.access_token)
+        }
+      } else {
+        setSavedEvents([])
+        setSavedUrlSet(new Set())
+        sessionHandledRef.current = false
+      }
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [applySignedInSession, loadSavedEvents])
+
+  const handleSendMagicLink = async (email) => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) throw new Error('Sign-in is not configured yet.')
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      },
+    })
+    if (error) throw error
+  }
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (supabase) await supabase.auth.signOut()
+    setUser(null)
+    setAccessToken(null)
+    setSavedEvents([])
+    setSavedUrlSet(new Set())
+    setShowAuthModal(false)
+  }
+
+  const isEventSaved = useCallback((event) => {
+    const url = getEventUrl(event)
+    if (!url) return false
+    return savedUrlSet.has(`${url}|${month}|${year}`)
+  }, [savedUrlSet, month, year])
+
+  const handleToggleSave = async () => {
+    if (!selectedEvent) return
+
+    if (!accessToken) {
+      setPendingSaveEvent(selectedEvent)
+      setAuthMessage('Sign in to save events you are interested in.')
+      setShowAuthModal(true)
+      return
+    }
+
+    const eventUrl = getEventUrl(selectedEvent)
+    if (!eventUrl) return
+
+    setSaveLoading(true)
+    try {
+      if (isEventSaved(selectedEvent)) {
+        await userApiFetch('/api/user/saved-events', accessToken, {
+          method: 'DELETE',
+          body: JSON.stringify({ eventUrl, month, year }),
+        })
+      } else {
+        await userApiFetch('/api/user/saved-events', accessToken, {
+          method: 'POST',
+          body: JSON.stringify({ eventUrl, month, year, status: 'interested' }),
+        })
+      }
+      await loadSavedEvents(accessToken)
+    } catch (e) {
+      setError(e.message || 'Could not update saved event.')
+    } finally {
+      setSaveLoading(false)
+    }
+  }
 
   const handleFind = async () => {
     if (hobbies.length === 0) { setError('Please pick at least one hobby.'); return }
@@ -83,6 +323,10 @@ export default function Home() {
       setEvents(result.events)
       setEventSources(['BookMyShow', 'District'])
       setStep(STEPS.CALENDAR)
+
+      if (accessToken) {
+        await savePreferences(accessToken, hobbies, location || 'Mumbai', month, year)
+      }
     } catch (e) {
       clearInterval(interval)
       setError(e.message || 'Something went wrong. Check SERPAPI_KEY in .env.local')
@@ -111,6 +355,10 @@ export default function Home() {
       setEventCache(prev => ({ ...prev, [cacheKey]: result.events }))
       setEvents(result.events)
       setEventSources(['BookMyShow', 'District'])
+
+      if (accessToken) {
+        await savePreferences(accessToken, hobbies, location || 'Mumbai', m, y)
+      }
     } catch (e) {
       setMonthError(e.message || 'Failed to load events for this month.')
     } finally {
@@ -133,11 +381,43 @@ export default function Home() {
               <span className={styles.logoMark}>◆</span>
               <span className={styles.logoText}>HobbyMap</span>
             </div>
-            {step === STEPS.CALENDAR && (
-              <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]) }}>
-                ← Change hobbies
-              </button>
-            )}
+
+            <div className={styles.headerActions}>
+              {step === STEPS.CALENDAR && (
+                <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]) }}>
+                  ← Change hobbies
+                </button>
+              )}
+
+              {authConfigured && user && savedEvents.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.savedBtn}
+                  onClick={() => setShowSavedPanel(true)}
+                >
+                  Saved ({savedEvents.length})
+                </button>
+              )}
+
+              {authConfigured && (
+                user ? (
+                  <div className={styles.accountChip}>
+                    <span className={styles.accountEmail}>{user.email}</span>
+                    <button type="button" className={styles.signOutBtn} onClick={handleSignOut}>
+                      Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.accountBtn}
+                    onClick={() => { setAuthMessage(''); setShowAuthModal(true) }}
+                  >
+                    Sign in
+                  </button>
+                )
+              )}
+            </div>
           </div>
         </header>
 
@@ -150,6 +430,14 @@ export default function Home() {
                 <h1 className={styles.heroTitle}>What do you love doing?</h1>
                 <p className={styles.heroSub}>Pick your interests and we&apos;ll fill your calendar with bookable events from BookMyShow and District.</p>
               </div>
+
+              {authConfigured && !user && (
+                <div className={styles.authCard}>
+                  <p className={styles.authCardTitle}>Optional account</p>
+                  <p className={styles.authCardSub}>Search without signing in. Create an account to save your calendar and mark events you&apos;re interested in.</p>
+                  <AuthPanel onSendMagicLink={handleSendMagicLink} onSignOut={handleSignOut} />
+                </div>
+              )}
 
               <div className={styles.card}>
                 <label className={styles.fieldLabel}>Your interests</label>
@@ -212,6 +500,36 @@ export default function Home() {
                   ))}
                 </div>
               </div>
+
+              {authConfigured && user && (
+                <section className={styles.savedSection}>
+                  <div className={styles.savedSectionHeader}>
+                    <h3 className={styles.savedSectionTitle}>Saved events</h3>
+                    {savedEvents.length > 0 && (
+                      <button type="button" className={styles.savedViewAll} onClick={() => setShowSavedPanel(true)}>
+                        View all
+                      </button>
+                    )}
+                  </div>
+                  {savedEvents.length === 0 ? (
+                    <p className={styles.savedEmpty}>Tap ★ Interested on any event to bookmark it here.</p>
+                  ) : (
+                    <div className={styles.savedPreview}>
+                      {savedEvents.slice(0, 3).map((ev, i) => (
+                        <button
+                          key={`${getEventUrl(ev)}-${i}`}
+                          type="button"
+                          className={styles.savedPreviewRow}
+                          onClick={() => setSelectedEvent(ev)}
+                        >
+                          <span>{ev.platformIcon || '📅'}</span>
+                          <span className={styles.savedPreviewName}>{ev.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
 
               {monthError && (
                 <p className={styles.error}>{monthError}</p>
@@ -284,7 +602,38 @@ export default function Home() {
           )}
         </main>
 
-        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        <EventModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          isSaved={selectedEvent ? isEventSaved(selectedEvent) : false}
+          onToggleSave={handleToggleSave}
+          saveLoading={saveLoading}
+          authConfigured={authConfigured}
+        />
+
+        {showAuthModal && authConfigured && (
+          <div className={styles.authOverlay} onClick={(e) => e.target === e.currentTarget && setShowAuthModal(false)}>
+            <div className={styles.authModal}>
+              <button type="button" className={styles.authClose} onClick={() => setShowAuthModal(false)}>×</button>
+              <h2 className={styles.authModalTitle}>Sign in</h2>
+              <AuthPanel
+                user={user}
+                onSendMagicLink={handleSendMagicLink}
+                onSignOut={handleSignOut}
+                message={authMessage}
+              />
+            </div>
+          </div>
+        )}
+
+        {showSavedPanel && (
+          <SavedEventsPanel
+            events={savedEvents}
+            onEventClick={(ev) => { setSelectedEvent(ev); setShowSavedPanel(false) }}
+            onClose={() => setShowSavedPanel(false)}
+          />
+        )}
+
         <DayEventsModal
           events={dayEvents}
           day={dayEvents?.[0] ? dayEvents[0].day : null}

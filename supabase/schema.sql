@@ -44,3 +44,75 @@ create index if not exists event_changelog_detected_at_idx
 
 create index if not exists search_cache_refreshed_at_idx
   on search_cache (refreshed_at);
+
+-- User account tables (optional accounts feature)
+
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists user_preferences (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  hobbies jsonb not null default '[]',
+  city text not null default 'Mumbai',
+  default_month int,
+  default_year int,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists saved_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  event_url text not null,
+  month int not null,
+  year int not null,
+  status text not null default 'interested',
+  created_at timestamptz not null default now(),
+  unique (user_id, event_url, month, year)
+);
+
+create index if not exists saved_events_user_id_idx
+  on saved_events (user_id, created_at desc);
+
+alter table profiles enable row level security;
+alter table user_preferences enable row level security;
+alter table saved_events enable row level security;
+
+create policy "Users read own profile"
+  on profiles for select
+  using (auth.uid() = id);
+
+create policy "Users insert own profile"
+  on profiles for insert
+  with check (auth.uid() = id);
+
+create policy "Users update own profile"
+  on profiles for update
+  using (auth.uid() = id);
+
+create policy "Users read own preferences"
+  on user_preferences for select
+  using (auth.uid() = user_id);
+
+create policy "Users insert own preferences"
+  on user_preferences for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users update own preferences"
+  on user_preferences for update
+  using (auth.uid() = user_id);
+
+create policy "Users read own saved events"
+  on saved_events for select
+  using (auth.uid() = user_id);
+
+create policy "Users insert own saved events"
+  on saved_events for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users delete own saved events"
+  on saved_events for delete
+  using (auth.uid() = user_id);

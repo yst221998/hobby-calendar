@@ -33,9 +33,11 @@ Discover bookable events in Mumbai based on your hobbies. Events are sourced fro
 | `SERPAPI_KEY` | Yes | Powers Google site searches for BookMyShow and District |
 | `SUPABASE_URL` | No | Supabase project URL for event caching |
 | `SUPABASE_SERVICE_ROLE_KEY` | No | Server-only key for cache read/write (never expose to browser) |
+| `NEXT_PUBLIC_SUPABASE_URL` | No | Same project URL, exposed to browser for optional magic-link auth |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | No | Supabase anon key for browser auth (safe for frontend) |
 | `CRON_SECRET` | No | Bearer token for weekly Vercel Cron refresh endpoint |
 
-Without Supabase, the app still works — it fetches live from SerpAPI every time.
+Without Supabase, the app still works — it fetches live from SerpAPI every time. Without the `NEXT_PUBLIC_*` auth variables, guest search still works; sign-in and saved events are disabled.
 
 ## Supabase setup (caching + change log)
 
@@ -66,6 +68,34 @@ Users can select as many hobbies as they want. The backend caps search terms to 
 When a weekly refresh finds different dates for an event, a row is added to `event_changelog` with `old_days` and `new_days`.
 
 View in Supabase: **Table Editor → event_changelog**.
+
+## Optional accounts (magic-link sign-in)
+
+Accounts are optional. Guests can search and build a calendar without signing in.
+
+Signed-in users can:
+
+- Save hobbies and Mumbai area automatically
+- Reload their saved calendar on return visits
+- Mark events as **Interested** and view them in a saved events panel
+
+### Supabase Auth setup
+
+1. In Supabase **Authentication → Providers**, enable **Email** (magic link).
+2. Set **Site URL** to your production URL (e.g. `https://your-app.vercel.app`).
+3. Add `http://localhost:3000` under **Redirect URLs** for local development.
+4. Run the user-account section of [`supabase/schema.sql`](supabase/schema.sql) if you already ran an older version (tables: `profiles`, `user_preferences`, `saved_events`).
+5. Add to `.env.local` and Vercel:
+   - `NEXT_PUBLIC_SUPABASE_URL` — same as `SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Project Settings → API (**anon public** key)
+6. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only. Never put it in frontend code.
+
+### Security notes
+
+- Browser code uses only `NEXT_PUBLIC_SUPABASE_ANON_KEY` for auth.
+- `/api/user/*` routes validate the user's bearer token on every request.
+- User preferences and saved events use Row Level Security in Supabase.
+- The shared `events` table stays global; saved events store URL references only.
 
 ## Weekly cron (Vercel)
 

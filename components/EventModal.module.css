@@ -92,6 +92,44 @@
   border-radius: 100px;
 }
 
+.interestedBtn, .savedBtn {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  margin-bottom: 16px;
+  transition: all 0.15s;
+}
+
+.interestedBtn {
+  background: var(--gold-light);
+  color: #7a5510;
+  border: 1.5px solid var(--gold);
+}
+
+.interestedBtn:hover:not(:disabled) {
+  background: var(--gold);
+  color: white;
+}
+
+.savedBtn {
+  background: var(--teal-light);
+  color: var(--teal);
+  border: 1.5px solid var(--teal);
+}
+
+.savedBtn:hover:not(:disabled) {
+  background: var(--teal);
+  color: white;
+}
+
+.interestedBtn:disabled, .savedBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .bookSection { margin-bottom: 16px; }
 
 .bookLabel {
