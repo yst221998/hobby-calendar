@@ -18,7 +18,9 @@
   color: var(--ink-2);
   transition: all 0.15s;
   font-family: 'DM Sans', sans-serif;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: left;
+  min-width: 0;
 }
 
 .chip:hover {
@@ -34,14 +36,15 @@
   font-weight: 500;
 }
 
-.emoji { font-size: 16px; }
+.emoji { font-size: 16px; flex-shrink: 0; }
 
 .customRow {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.customRow input { flex: 1; }
+.customRow input { flex: 1 1 160px; min-width: 0; }
 
 .addBtn {
   padding: 10px 20px;
@@ -87,3 +90,24 @@
 }
 
 .removeBtn:hover { color: var(--ink); }
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .chip {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 12px;
+  }
+
+  .customRow {
+    flex-direction: column;
+  }
+
+  .addBtn {
+    width: 100%;
+  }
+}

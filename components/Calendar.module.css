@@ -51,6 +51,12 @@
   letter-spacing: 0.05em;
 }
 
+.dayLabelShort { display: none; }
+
+.gridWrap {
+  width: 100%;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -72,6 +78,7 @@
   flex-direction: column;
   gap: 3px;
   transition: border-color 0.15s;
+  min-width: 0;
 }
 
 .cell:hover { border-color: var(--paper-3); }
@@ -111,6 +118,7 @@
   transition: opacity 0.1s;
   display: block;
   width: 100%;
+  max-width: 100%;
 }
 
 .eventPill:hover { opacity: 0.8; }
@@ -132,3 +140,29 @@
 }
 
 .moreBtn:hover { color: var(--ink); }
+
+.moreBtnMobile { display: none; }
+
+@media (max-width: 600px) {
+  .monthTitle { font-size: 18px; }
+
+  .dayLabelFull { display: none; }
+  .dayLabelShort { display: inline; }
+
+  .emptyCell, .cell {
+    min-height: 52px;
+    padding: 4px;
+  }
+
+  .dateNum { font-size: 11px; }
+
+  .eventPill {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+
+  /* Show only first event pill on small screens */
+  .eventPill ~ .eventPill { display: none; }
+
+  .moreBtnMobile { display: block; }
+}

@@ -1,6 +1,52 @@
 import { getSupabase } from "../../../lib/supabase";
 import { getUserFromRequest, ensureProfile } from "../../../lib/auth";
 import { eventsFromDbRows } from "../../../lib/cache";
+import { primaryBookingLink } from "../../../lib/events";
+
+function stubFromSavedRow(row) {
+  const platform = row.platform || "BookMyShow";
+  const icon = platform === "District" ? "🏙️" : "🎟️";
+  return {
+    name: row.event_name || "Saved event",
+    venue: "Mumbai",
+    time: "Check listing",
+    price: "See listing",
+    platforms: [platform],
+    platformIcon: icon,
+    bookingLinks: { [platform]: row.event_url },
+    source: "real",
+    hobby: null,
+    day: null,
+    enrichTier: "saved",
+  };
+}
+
+function mergeSavedWithDetails(savedRows, detailEvents) {
+  const byUrl = new Map();
+  for (const ev of detailEvents || []) {
+    const url = primaryBookingLink(ev);
+    if (!url) continue;
+    if (!byUrl.has(url)) byUrl.set(url, []);
+    byUrl.get(url).push(ev);
+  }
+
+  const events = [];
+  const savedUrls = [];
+
+  for (const row of savedRows) {
+    const key = `${row.event_url}|${row.month}|${row.year}`;
+    savedUrls.push(key);
+
+    const matches = byUrl.get(row.event_url);
+    if (matches && matches.length > 0) {
+      events.push(...matches);
+    } else {
+      events.push(stubFromSavedRow(row));
+    }
+  }
+
+  return { events, savedUrls };
+}
 
 export default async function handler(req, res) {
   const user = await getUserFromRequest(req);
@@ -25,7 +71,7 @@ export default async function handler(req, res) {
     }
 
     if (!savedRows || savedRows.length === 0) {
-      return res.status(200).json({ events: [], savedUrls: [] });
+      return res.status(200).json({ events: [], savedUrls: [], count: 0 });
     }
 
     const urls = [...new Set(savedRows.map((row) => row.event_url))];
@@ -38,14 +84,21 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: eventError.message });
     }
 
-    const events = eventsFromDbRows(eventRows || []);
-    const savedUrls = savedRows.map((row) => `${row.event_url}|${row.month}|${row.year}`);
+    const detailEvents = eventsFromDbRows(eventRows || []);
+    const { events, savedUrls } = mergeSavedWithDetails(savedRows, detailEvents);
 
-    return res.status(200).json({ events, savedUrls });
+    return res.status(200).json({ events, savedUrls, count: savedRows.length });
   }
 
   if (req.method === "POST") {
-    const { eventUrl, month, year, status = "interested" } = req.body || {};
+    const {
+      eventUrl,
+      month,
+      year,
+      status = "interested",
+      eventName = null,
+      platform = null,
+    } = req.body || {};
 
     if (!eventUrl || typeof month !== "number" || typeof year !== "number") {
       return res.status(400).json({ error: "eventUrl, month, and year are required" });
@@ -60,6 +113,8 @@ export default async function handler(req, res) {
         month,
         year,
         status,
+        event_name: eventName,
+        platform,
       },
       { onConflict: "user_id,event_url,month,year" }
     );

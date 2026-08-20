@@ -187,6 +187,8 @@ export default function Home() {
               month: currentMonth,
               year: currentYear,
               status: 'interested',
+              eventName: pending.name || null,
+              platform: pending.platforms?.[0] || null,
             }),
           })
           await loadSavedEvents(token)
@@ -203,33 +205,65 @@ export default function Home() {
     if (!supabase) return
 
     let active = true
+    let bootstrapped = false
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!active || !session) return
+    const cleanAuthParamsFromUrl = () => {
+      if (typeof window === 'undefined') return
+      const url = new URL(window.location.href)
+      const hash = url.hash || ''
+      const hasAuthHash = hash.includes('access_token') || hash.includes('type=magiclink') || hash.includes('type=recovery')
+      const hasAuthQuery = url.searchParams.has('code') || url.searchParams.has('token_hash')
+      if (hasAuthHash || hasAuthQuery) {
+        window.history.replaceState({}, document.title, `${url.origin}${url.pathname}`)
+      }
+    }
+
+    const bootstrapSession = async (session) => {
+      if (!active || !session?.access_token) return
       setUser(session.user)
       setAccessToken(session.access_token)
-      sessionHandledRef.current = true
-      await applySignedInSession(session)
+      setShowAuthModal(false)
+      cleanAuthParamsFromUrl()
+      if (!bootstrapped) {
+        bootstrapped = true
+        sessionHandledRef.current = true
+        await applySignedInSession(session)
+      } else {
+        await loadSavedEvents(session.access_token)
+      }
+    }
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) await bootstrapSession(session)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!active) return
 
-      setUser(session?.user ?? null)
-      setAccessToken(session?.access_token ?? null)
-
       if (session?.access_token) {
+        setUser(session.user)
+        setAccessToken(session.access_token)
         setShowAuthModal(false)
-        if (event === 'SIGNED_IN' && !sessionHandledRef.current) {
-          sessionHandledRef.current = true
-          await applySignedInSession(session)
+
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          cleanAuthParamsFromUrl()
+          if (!sessionHandledRef.current) {
+            sessionHandledRef.current = true
+            bootstrapped = true
+            await applySignedInSession(session)
+          } else if (event === 'SIGNED_IN') {
+            await loadSavedEvents(session.access_token)
+          }
         } else if (event === 'TOKEN_REFRESHED') {
           await loadSavedEvents(session.access_token)
         }
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setAccessToken(null)
         setSavedEvents([])
         setSavedUrlSet(new Set())
         sessionHandledRef.current = false
+        bootstrapped = false
       }
     })
 
@@ -280,9 +314,29 @@ export default function Home() {
     const eventUrl = getEventUrl(selectedEvent)
     if (!eventUrl) return
 
+    const saveKey = `${eventUrl}|${month}|${year}`
+    const currentlySaved = savedUrlSet.has(saveKey)
+
     setSaveLoading(true)
+
+    // Optimistic UI update
+    if (currentlySaved) {
+      setSavedUrlSet(prev => {
+        const next = new Set(prev)
+        next.delete(saveKey)
+        return next
+      })
+      setSavedEvents(prev => prev.filter(ev => getEventUrl(ev) !== eventUrl))
+    } else {
+      setSavedUrlSet(prev => new Set(prev).add(saveKey))
+      setSavedEvents(prev => {
+        if (prev.some(ev => getEventUrl(ev) === eventUrl)) return prev
+        return [selectedEvent, ...prev]
+      })
+    }
+
     try {
-      if (isEventSaved(selectedEvent)) {
+      if (currentlySaved) {
         await userApiFetch('/api/user/saved-events', accessToken, {
           method: 'DELETE',
           body: JSON.stringify({ eventUrl, month, year }),
@@ -290,11 +344,20 @@ export default function Home() {
       } else {
         await userApiFetch('/api/user/saved-events', accessToken, {
           method: 'POST',
-          body: JSON.stringify({ eventUrl, month, year, status: 'interested' }),
+          body: JSON.stringify({
+            eventUrl,
+            month,
+            year,
+            status: 'interested',
+            eventName: selectedEvent.name || null,
+            platform: selectedEvent.platforms?.[0] || null,
+          }),
         })
       }
       await loadSavedEvents(accessToken)
     } catch (e) {
+      // Revert optimistic update
+      await loadSavedEvents(accessToken)
       setError(e.message || 'Could not update saved event.')
     } finally {
       setSaveLoading(false)
@@ -371,6 +434,7 @@ export default function Home() {
       <Head>
         <title>Hobby Calendar — Mumbai Events</title>
         <meta name="description" content="Discover events and activities in Mumbai tailored to your hobbies" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -384,12 +448,16 @@ export default function Home() {
 
             <div className={styles.headerActions}>
               {step === STEPS.CALENDAR && (
-                <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]) }}>
+                <button
+                  type="button"
+                  className={`${styles.resetBtn} ${styles.resetBtnDesktop}`}
+                  onClick={() => { setStep(STEPS.INPUT); setEvents([]) }}
+                >
                   ← Change hobbies
                 </button>
               )}
 
-              {authConfigured && user && savedEvents.length > 0 && (
+              {authConfigured && user && (
                 <button
                   type="button"
                   className={styles.savedBtn}
@@ -493,6 +561,13 @@ export default function Home() {
                   {eventSources.length > 0 && (
                     <p className={styles.sourcesList}>From: {eventSources.join(' · ')}</p>
                   )}
+                  <button
+                    type="button"
+                    className={`${styles.resetBtn} ${styles.resetBtnMobile}`}
+                    onClick={() => { setStep(STEPS.INPUT); setEvents([]) }}
+                  >
+                    ← Change hobbies
+                  </button>
                 </div>
                 <div className={styles.legend}>
                   {hobbies.slice(0, 4).map((h, i) => (
@@ -573,7 +648,9 @@ export default function Home() {
                   {unscheduledEvents.length > 0 && (
                     <section className={styles.tbdSection}>
                       <h3 className={styles.tbdTitle}>Dates TBD this month</h3>
-                      <p className={styles.tbdSub}>{unscheduledEvents.length} valid event page{unscheduledEvents.length !== 1 ? 's' : ''} without a confirmed date this month</p>
+                      <p className={styles.tbdSub}>
+                        {unscheduledEvents.length} listing{unscheduledEvents.length !== 1 ? 's' : ''} without a confirmed date this month — closed or cancelled shows are filtered out
+                      </p>
                       <div className={styles.tbdList}>
                         {unscheduledEvents.map((ev, i) => (
                           <button

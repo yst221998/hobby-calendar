@@ -19,12 +19,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .logo {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .logoMark {
@@ -54,12 +57,22 @@
   color: var(--ink);
 }
 
+.resetBtnMobile {
+  display: none;
+  margin-top: 12px;
+}
+
+.resetBtnDesktop {
+  display: inline-flex;
+}
+
 .headerActions {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .accountBtn, .savedBtn {
@@ -569,4 +582,33 @@
   .main { padding: 24px 16px 60px; }
   .heroTitle { font-size: 28px; }
   .calendarHeader { flex-direction: column; }
+  .headerInner {
+    padding: 12px 16px;
+    align-items: flex-start;
+  }
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .accountEmail {
+    display: none;
+  }
+  .resetBtnDesktop {
+    display: none;
+  }
+  .resetBtnMobile {
+    display: inline-flex;
+  }
+  .accountBtn, .savedBtn, .signOutBtn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  .authOverlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+  .authModal {
+    max-width: 100%;
+    padding: 20px 16px;
+  }
 }

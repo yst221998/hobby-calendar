@@ -58,6 +58,7 @@
   font-size: 14px;
   color: var(--ink);
   margin-bottom: 10px;
+  word-break: break-word;
 }
 
 .signOutBtn {
@@ -72,4 +73,15 @@
 .signOutBtn:hover {
   border-color: var(--ink-3);
   color: var(--ink);
+}
+
+@media (max-width: 600px) {
+  .form {
+    flex-direction: column;
+  }
+
+  .input, .submitBtn {
+    width: 100%;
+    flex: none;
+  }
 }

@@ -70,9 +70,15 @@ create table if not exists saved_events (
   month int not null,
   year int not null,
   status text not null default 'interested',
+  event_name text,
+  platform text,
   created_at timestamptz not null default now(),
   unique (user_id, event_url, month, year)
 );
+
+-- If saved_events already exists without name/platform, run:
+-- alter table saved_events add column if not exists event_name text;
+-- alter table saved_events add column if not exists platform text;
 
 create index if not exists saved_events_user_id_idx
   on saved_events (user_id, created_at desc);
