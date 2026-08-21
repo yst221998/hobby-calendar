@@ -106,13 +106,17 @@ export default function Home() {
   }, [])
 
   const loadSavedEvents = useCallback(async (token) => {
-    if (!token) return
+    if (!token) return false
     try {
       const data = await userApiFetch('/api/user/saved-events', token)
       setSavedEvents(data.events || [])
       setSavedUrlSet(new Set(data.savedUrls || []))
+      return true
     } catch (e) {
       console.error('Could not load saved events:', e.message)
+      setError(e.message || 'Could not load saved events.')
+      // Do not wipe existing list on GET failure
+      return false
     }
   }, [])
 
@@ -143,36 +147,42 @@ export default function Home() {
     }
   }, [buildCacheKey, fetchEvents])
 
-  const applySignedInSession = useCallback(async (session) => {
+  const applySignedInSession = useCallback(async (session, options = {}) => {
     if (!session?.access_token) return
 
+    const { isGuestMerge = false } = options
     const token = session.access_token
     const currentHobbies = hobbiesRef.current
     const currentLocation = locationRef.current
     const currentMonth = monthRef.current
     const currentYear = yearRef.current
 
+    // Always load saved events from the account
     await loadSavedEvents(token)
 
-    if (currentHobbies.length > 0) {
+    // Guest → sign-in with hobbies already picked: save those onto the account
+    if (isGuestMerge && currentHobbies.length > 0) {
       await savePreferences(token, currentHobbies, currentLocation || 'Mumbai', currentMonth, currentYear)
-    } else {
-      try {
-        const prefs = await userApiFetch('/api/user/preferences', token)
-        if (prefs.hobbies?.length) {
-          setHobbies(prefs.hobbies)
-          setLocation(prefs.city === 'Mumbai' ? '' : prefs.city || '')
+    }
 
-          const m = typeof prefs.defaultMonth === 'number' ? prefs.defaultMonth : currentMonth
-          const y = typeof prefs.defaultYear === 'number' ? prefs.defaultYear : currentYear
-          setMonth(m)
-          setYear(y)
+    // Always restore preferences from the account (source of truth)
+    try {
+      const prefs = await userApiFetch('/api/user/preferences', token)
+      if (prefs.hobbies?.length) {
+        setHobbies(prefs.hobbies)
+        setLocation(prefs.city === 'Mumbai' ? '' : prefs.city || '')
 
-          await runCalendarLoad(prefs.hobbies, prefs.city || 'Mumbai', m, y)
-        }
-      } catch (e) {
-        console.error('Could not load preferences:', e.message)
+        const m = typeof prefs.defaultMonth === 'number' ? prefs.defaultMonth : currentMonth
+        const y = typeof prefs.defaultYear === 'number' ? prefs.defaultYear : currentYear
+        setMonth(m)
+        setYear(y)
+
+        // Always rebuild calendar from saved hobbies on restore / guest merge
+        await runCalendarLoad(prefs.hobbies, prefs.city || 'Mumbai', m, y)
       }
+    } catch (e) {
+      console.error('Could not load preferences:', e.message)
+      setError(e.message || 'Could not load your saved hobbies.')
     }
 
     const pending = pendingSaveRef.current
@@ -194,6 +204,7 @@ export default function Home() {
           await loadSavedEvents(token)
         } catch (e) {
           console.error('Could not save event after sign-in:', e.message)
+          setError(e.message || 'Could not save event after sign-in.')
         }
       }
       setPendingSaveEvent(null)
@@ -218,7 +229,7 @@ export default function Home() {
       }
     }
 
-    const bootstrapSession = async (session) => {
+    const bootstrapSession = async (session, isGuestMerge = false) => {
       if (!active || !session?.access_token) return
       setUser(session.user)
       setAccessToken(session.access_token)
@@ -227,14 +238,15 @@ export default function Home() {
       if (!bootstrapped) {
         bootstrapped = true
         sessionHandledRef.current = true
-        await applySignedInSession(session)
+        await applySignedInSession(session, { isGuestMerge })
       } else {
         await loadSavedEvents(session.access_token)
       }
     }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) await bootstrapSession(session)
+      // Refresh / returning visit — restore account, not guest merge
+      if (session) await bootstrapSession(session, false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -247,12 +259,19 @@ export default function Home() {
 
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           cleanAuthParamsFromUrl()
+          const hadGuestHobbies = hobbiesRef.current.length > 0
           if (!sessionHandledRef.current) {
             sessionHandledRef.current = true
             bootstrapped = true
-            await applySignedInSession(session)
+            // SIGNED_IN after magic link with hobbies in memory = guest merge
+            const isGuestMerge = event === 'SIGNED_IN' && hadGuestHobbies
+            await applySignedInSession(session, { isGuestMerge })
           } else if (event === 'SIGNED_IN') {
-            await loadSavedEvents(session.access_token)
+            if (hadGuestHobbies) {
+              await applySignedInSession(session, { isGuestMerge: true })
+            } else {
+              await loadSavedEvents(session.access_token)
+            }
           }
         } else if (event === 'TOKEN_REFRESHED') {
           await loadSavedEvents(session.access_token)
@@ -316,6 +335,8 @@ export default function Home() {
 
     const saveKey = `${eventUrl}|${month}|${year}`
     const currentlySaved = savedUrlSet.has(saveKey)
+    const prevEvents = savedEvents
+    const prevUrls = new Set(savedUrlSet)
 
     setSaveLoading(true)
 
@@ -354,11 +375,15 @@ export default function Home() {
           }),
         })
       }
-      await loadSavedEvents(accessToken)
+      const ok = await loadSavedEvents(accessToken)
+      if (!ok) {
+        // GET failed after successful write — keep optimistic state
+      }
     } catch (e) {
-      // Revert optimistic update
-      await loadSavedEvents(accessToken)
-      setError(e.message || 'Could not update saved event.')
+      // Revert optimistic update on POST/DELETE failure
+      setSavedEvents(prevEvents)
+      setSavedUrlSet(prevUrls)
+      setError(e.message || 'Could not update saved event. Try signing in again.')
     } finally {
       setSaveLoading(false)
     }

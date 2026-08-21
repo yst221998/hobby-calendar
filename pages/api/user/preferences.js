@@ -1,10 +1,15 @@
 import { getSupabase } from "../../../lib/supabase";
-import { getUserFromRequest, ensureProfile } from "../../../lib/auth";
+import {
+  getUserFromRequestDetailed,
+  ensureProfile,
+  authErrorResponse,
+} from "../../../lib/auth";
 
 export default async function handler(req, res) {
-  const user = await getUserFromRequest(req);
+  const { user, reason } = await getUserFromRequestDetailed(req);
   if (!user) {
-    return res.status(401).json({ error: "Sign in required" });
+    const { status, error } = authErrorResponse(reason);
+    return res.status(status).json({ error });
   }
 
   const supabase = getSupabase();
@@ -36,6 +41,10 @@ export default async function handler(req, res) {
 
     if (!Array.isArray(hobbies)) {
       return res.status(400).json({ error: "hobbies must be an array" });
+    }
+
+    if (hobbies.length === 0) {
+      return res.status(400).json({ error: "Cannot save empty hobbies" });
     }
 
     await ensureProfile(supabase, user);
