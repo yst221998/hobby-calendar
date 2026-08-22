@@ -1,5 +1,9 @@
 import { getSupabase } from "../../../lib/supabase";
-import { getUserFromRequest, ensureProfile } from "../../../lib/auth";
+import {
+  getUserFromRequestDetailed,
+  ensureProfile,
+  authErrorResponse,
+} from "../../../lib/auth";
 import { eventsFromDbRows } from "../../../lib/cache";
 import { primaryBookingLink } from "../../../lib/events";
 
@@ -49,9 +53,10 @@ function mergeSavedWithDetails(savedRows, detailEvents) {
 }
 
 export default async function handler(req, res) {
-  const user = await getUserFromRequest(req);
+  const { user, reason } = await getUserFromRequestDetailed(req);
   if (!user) {
-    return res.status(401).json({ error: "Sign in required" });
+    const { status, error } = authErrorResponse(reason);
+    return res.status(status).json({ error });
   }
 
   const supabase = getSupabase();
