@@ -11,6 +11,7 @@ import { userApiFetch, getEventUrl } from '../lib/userApi'
 import styles from './index.module.css'
 
 const { saveGuestDraft, readGuestDraft, clearGuestDraft } = require('../lib/guestDraft')
+const { getCityLabel } = require('../lib/eventCity')
 
 const STEPS = { INPUT: 'input', LOADING: 'loading', CALENDAR: 'calendar' }
 
@@ -73,7 +74,7 @@ export default function Home() {
 
   const buildCacheKey = useCallback((m, y, currentHobbies, currentLocation) => {
     const sortedHobbies = [...currentHobbies].sort().join('|')
-    return `${m}-${y}-${currentLocation || 'Mumbai'}-${sortedHobbies}`
+    return `${m}-${y}-${currentLocation || ''}-${sortedHobbies}`
   }, [])
 
   const fetchEvents = useCallback(async (m, y, currentHobbies, currentLocation, cache) => {
@@ -83,7 +84,7 @@ export default function Home() {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hobbies: currentHobbies, city: currentLocation || 'Mumbai', month: m, year: y }),
+      body: JSON.stringify({ hobbies: currentHobbies, preferredArea: currentLocation || '', month: m, year: y }),
     })
     const data = await res.json()
     if (data.error) throw new Error(data.error)
@@ -97,7 +98,8 @@ export default function Home() {
         method: 'POST',
         body: JSON.stringify({
           hobbies: hobbyList,
-          city: city || 'Mumbai',
+          preferredArea: city || '',
+          city: city || '',
           month: m,
           year: y,
         }),
@@ -165,14 +167,14 @@ export default function Home() {
 
     if (draft?.hobbies?.length) {
       setHobbies(draft.hobbies)
-      setLocation(draft.location || '')
+      setLocation(draft.preferredArea || draft.location || '')
       setMonth(draft.month)
       setYear(draft.year)
 
       const saveResult = await savePreferences(
         token,
         draft.hobbies,
-        draft.location || 'Mumbai',
+        draft.preferredArea || draft.location || '',
         draft.month,
         draft.year
       )
@@ -184,7 +186,7 @@ export default function Home() {
 
       await runCalendarLoad(
         draft.hobbies,
-        draft.location || 'Mumbai',
+        draft.preferredArea || draft.location || '',
         draft.month,
         draft.year
       )
@@ -194,14 +196,14 @@ export default function Home() {
         const prefs = await userApiFetch('/api/user/preferences', token)
         if (prefs.hobbies?.length) {
           setHobbies(prefs.hobbies)
-          setLocation(prefs.city === 'Mumbai' ? '' : prefs.city || '')
+          setLocation(prefs.preferredArea || (prefs.city && prefs.city !== 'Mumbai' ? prefs.city : '') || '')
 
           const m = typeof prefs.defaultMonth === 'number' ? prefs.defaultMonth : currentMonth
           const y = typeof prefs.defaultYear === 'number' ? prefs.defaultYear : currentYear
           setMonth(m)
           setYear(y)
 
-          await runCalendarLoad(prefs.hobbies, prefs.city || 'Mumbai', m, y)
+          await runCalendarLoad(prefs.hobbies, prefs.preferredArea || (prefs.city && prefs.city !== 'Mumbai' ? prefs.city : '') || '', m, y)
         }
       } catch (e) {
         console.error('Could not load preferences:', e.message)
@@ -223,6 +225,8 @@ export default function Home() {
               status: 'interested',
               eventName: pending.name || null,
               platform: pending.platforms?.[0] || null,
+              normalizedCity: pending.normalizedCity || null,
+              venue: pending.venue || null,
             }),
           })
           await loadSavedEvents(token)
@@ -321,6 +325,7 @@ export default function Home() {
     if (hobbiesRef.current.length > 0) {
       saveGuestDraft({
         hobbies: hobbiesRef.current,
+        preferredArea: locationRef.current,
         location: locationRef.current,
         month: monthRef.current,
         year: yearRef.current,
@@ -406,6 +411,8 @@ export default function Home() {
             status: 'interested',
             eventName: selectedEvent.name || null,
             platform: selectedEvent.platforms?.[0] || null,
+            normalizedCity: selectedEvent.normalizedCity || null,
+            venue: selectedEvent.venue || null,
           }),
         })
       }
@@ -427,7 +434,7 @@ export default function Home() {
     if (hobbies.length === 0) { setError('Please pick at least one hobby.'); return }
     setError('')
     setMonthError('')
-    saveGuestDraft({ hobbies, location, month, year })
+    saveGuestDraft({ hobbies, preferredArea: location, location, month, year })
     setStep(STEPS.LOADING)
 
     let msgIndex = 0
@@ -448,7 +455,7 @@ export default function Home() {
       setStep(STEPS.CALENDAR)
 
       if (accessToken) {
-        const saveResult = await savePreferences(accessToken, hobbies, location || 'Mumbai', month, year)
+        const saveResult = await savePreferences(accessToken, hobbies, location || '', month, year)
         if (saveResult.ok) clearGuestDraft()
         else if (saveResult.error) setError(saveResult.error.message || 'Could not save your hobbies.')
       }
@@ -482,7 +489,7 @@ export default function Home() {
       setEventSources(['BookMyShow', 'District'])
 
       if (accessToken) {
-        const saveResult = await savePreferences(accessToken, hobbies, location || 'Mumbai', m, y)
+        const saveResult = await savePreferences(accessToken, hobbies, location || '', m, y)
         if (saveResult.ok) clearGuestDraft()
         else if (saveResult.error) setMonthError(saveResult.error.message || 'Could not save this month.')
       }
@@ -496,8 +503,8 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Hobby Calendar — Mumbai Events</title>
-        <meta name="description" content="Discover events and activities in Mumbai tailored to your hobbies" />
+        <title>Hobby Calendar — Mumbai Metro Events</title>
+        <meta name="description" content="Discover events and activities in Mumbai, Navi Mumbai, and Thane tailored to your hobbies" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -558,9 +565,9 @@ export default function Home() {
           {step === STEPS.INPUT && (
             <div className={styles.inputSection}>
               <div className={styles.hero}>
-                <p className={styles.heroEyebrow}>Mumbai · Events · Just for you</p>
+                <p className={styles.heroEyebrow}>Mumbai Metro · Events · Just for you</p>
                 <h1 className={styles.heroTitle}>What do you love doing?</h1>
-                <p className={styles.heroSub}>Pick your interests and we&apos;ll fill your calendar with bookable events from BookMyShow and District.</p>
+                <p className={styles.heroSub}>Pick your interests and we&apos;ll fill your calendar with bookable events from BookMyShow and District across Mumbai, Navi Mumbai, and Thane.</p>
               </div>
 
               {authConfigured && !user && (
@@ -577,14 +584,15 @@ export default function Home() {
               </div>
 
               <div className={styles.card}>
-                <label className={styles.fieldLabel}>Your area in Mumbai</label>
+                <label className={styles.fieldLabel}>Preferred area (optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Bandra, Andheri, Lower Parel (optional)"
+                  placeholder="e.g. Bandra, Vashi, or Thane West"
                   value={location}
                   onChange={e => setLocation(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleFind()}
                 />
+                <p className={styles.hint}>Results cover Mumbai, Navi Mumbai, and Thane. A preferred area only helps ranking, it does not hide the other two cities.</p>
               </div>
 
               {error && <p className={styles.error}>{error}</p>}
@@ -620,7 +628,7 @@ export default function Home() {
                 <div>
                   <h2 className={styles.calendarTitle}>Your events calendar</h2>
                   <p className={styles.calendarSub}>
-                    {scheduledEvents.length} showings · {uniqueEventCount} events · {hobbies.join(', ')} · {location || 'Mumbai'}
+                    {scheduledEvents.length} showings · {uniqueEventCount} events · {hobbies.join(', ')} · Mumbai Metro{location ? ` · ${location}` : ''}
                   </p>
                   {eventSources.length > 0 && (
                     <p className={styles.sourcesList}>From: {eventSources.join(' · ')}</p>
@@ -663,6 +671,7 @@ export default function Home() {
                         >
                           <span>{ev.platformIcon || '📅'}</span>
                           <span className={styles.savedPreviewName}>{ev.name}</span>
+                          <span className={styles.savedPreviewCity}>{getCityLabel(ev.normalizedCity) || 'Location not verified'}</span>
                         </button>
                       ))}
                     </div>
@@ -683,7 +692,7 @@ export default function Home() {
                 <div className={styles.emptyState}>
                   <p className={styles.emptyIcon}>🔍</p>
                   <h3>No events found this month</h3>
-                  <p>We only show specific bookable events on BookMyShow and District — venue listings, category pages, and other cities are filtered out. Try a different month or adjust your interests.</p>
+                  <p>We only show specific bookable events on BookMyShow and District in Mumbai, Navi Mumbai, or Thane — venue listings, category pages, and other cities are filtered out. Try a different month or adjust your interests.</p>
                   <button className={styles.resetBtn} onClick={() => { setStep(STEPS.INPUT); setEvents([]); setEventCache({}) }}>Try different hobbies</button>
                 </div>
               ) : (
@@ -725,7 +734,10 @@ export default function Home() {
                             <span className={styles.tbdIcon}>{ev.platformIcon || '📅'}</span>
                             <div className={styles.tbdInfo}>
                               <p className={styles.tbdName}>{ev.name}</p>
-                              <p className={styles.tbdMeta}>{ev.platforms?.[0]} · {ev.price}</p>
+                              <p className={styles.tbdMeta}>
+                                {getCityLabel(ev.normalizedCity) || 'Location not verified'} · {ev.platforms?.[0]} · {ev.price}
+                                {ev.venue && ev.venue !== 'Venue not provided' ? ` · ${ev.venue}` : ''}
+                              </p>
                             </div>
                             <span className={styles.tbdArrow}>→</span>
                           </button>

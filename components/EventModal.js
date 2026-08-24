@@ -1,5 +1,8 @@
 import styles from './EventModal.module.css'
 
+const { getCityLabel } = require('../lib/eventCity')
+const { formatEventLocation } = require('../lib/eventDisplay')
+
 const PLATFORM_ICONS = {
   'BookMyShow': '🎟️',
   'District': '🏙️',
@@ -24,9 +27,15 @@ export default function EventModal({
           {event.source === 'real' && <span className={styles.realBadge}>Live Event</span>}
           {event.source === 'partial' && <span className={styles.browseBadge}>Browse on platform</span>}
           {event.day === null && <span className={styles.tbdBadge}>Date TBD</span>}
+          {getCityLabel(event.normalizedCity) && (
+            <span className={styles.cityBadge}>{getCityLabel(event.normalizedCity)}</span>
+          )}
+          {event.locationVerificationRequired && (
+            <span className={styles.cityBadge}>Location not verified</span>
+          )}
           <h2 className={styles.title}>{event.name}</h2>
           <div className={styles.meta}>
-            <span>📍 {event.venue}</span>
+            <span>📍 {formatEventLocation(event)}</span>
             <span>🕐 {event.time}</span>
             <span>💰 {event.price}</span>
           </div>

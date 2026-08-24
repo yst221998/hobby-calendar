@@ -1,5 +1,7 @@
 import styles from './DayEventsModal.module.css'
 
+const { getCityLabel } = require('../lib/eventCity')
+
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 export default function DayEventsModal({ events, day, month, year, onClose, onEventClick }) {
@@ -26,7 +28,7 @@ export default function DayEventsModal({ events, day, month, year, onClose, onEv
               <span className={styles.icon}>{ev.platformIcon || '📅'}</span>
               <div className={styles.info}>
                 <p className={styles.name}>{ev.name}</p>
-                <p className={styles.meta}>{ev.time} · {ev.venue}</p>
+                <p className={styles.meta}>{getCityLabel(ev.normalizedCity) || 'Location not verified'} · {ev.time} · {ev.venue && ev.venue !== 'Venue not provided' ? ev.venue : 'Venue not provided'}</p>
               </div>
               <div className={styles.right}>
                 <span className={styles.price}>{ev.price}</span>

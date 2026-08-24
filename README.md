@@ -1,6 +1,6 @@
-# HobbyMap — Mumbai Events Calendar
+# HobbyMap — Mumbai Metro Events Calendar
 
-Discover bookable events in Mumbai based on your hobbies. Events are sourced from **BookMyShow** and **District** via SerpAPI site search, with optional Supabase caching.
+Discover bookable events in **Mumbai, Navi Mumbai, and Thane** based on your hobbies. Events are sourced from **BookMyShow** and **District** via SerpAPI site search, with optional Supabase caching. Every listed event is classified into one of those three cities; unknown or out-of-metro listings are excluded.
 
 ## Setup
 
@@ -42,18 +42,24 @@ Without Supabase, the app still works — it fetches live from SerpAPI every tim
 ## Supabase setup (caching + change log)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run the contents of [`supabase/schema.sql`](supabase/schema.sql).
-3. Copy **Project URL** and **service_role** key from Project Settings → API.
-4. Add both to `.env.local` and to **Vercel Environment Variables**.
-5. Redeploy on Vercel.
+2. Open **SQL Editor** and run the contents of [`supabase/schema.sql`](supabase/schema.sql) for a new project.
+3. For an existing project, also run [`supabase/migrations/20260824_add_event_city.sql`](supabase/migrations/20260824_add_event_city.sql) **before** deploying code that writes `normalized_city`. This migration:
+   - adds `events.normalized_city` and `saved_events.normalized_city` / `venue`
+   - truncates `search_cache` (derived search results only)
+   - deletes `events` rows that have no verified city
+   - does **not** truncate `saved_events` or `user_preferences`
+4. Copy **Project URL** and **service_role** key from Project Settings → API.
+5. Add both to `.env.local` and to **Vercel Environment Variables**.
+6. Redeploy on Vercel.
 
 ### What gets cached
 
-- Each search (hobbies + month + year + city) is stored for **7 days**.
+- Each search (hobbies + month + year + optional preferred area) is stored for **7 days**.
 - Repeat searches within 7 days load from Supabase instantly (no SerpAPI calls).
-- Individual events are stored by URL with their performance dates.
-- Events discovered by one user can be reused for another user searching the same hobbies and month.
-- Empty searches are not cached, so bad zero-result fetches are not preserved for seven days.
+- Individual events are stored by URL with their performance dates and a verified `normalized_city` of `mumbai`, `navi_mumbai`, or `thane`.
+- Events discovered by one user can be reused for another user searching the same hobbies and month, **only if those events are already classified into the Mumbai metro**.
+- `search_cache.city` is a legacy column that stores the optional preferred area, not the event city.
+- Empty searches and unclassified events are not cached.
 
 ### Supported hobbies
 
@@ -75,7 +81,7 @@ Accounts are optional. Guests can search and build a calendar without signing in
 
 Signed-in users can:
 
-- Save hobbies and Mumbai area automatically
+- Save hobbies and an optional preferred area automatically
 - Reload their saved calendar on return visits
 - Mark events as **Interested** and view them in a saved events panel
 

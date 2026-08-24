@@ -5,52 +5,11 @@ import {
   authErrorResponse,
 } from "../../../lib/auth";
 import { eventsFromDbRows } from "../../../lib/cache";
-import { primaryBookingLink } from "../../../lib/events";
-
-function stubFromSavedRow(row) {
-  const platform = row.platform || "BookMyShow";
-  const icon = platform === "District" ? "🏙️" : "🎟️";
-  return {
-    name: row.event_name || "Saved event",
-    venue: "Mumbai",
-    time: "Check listing",
-    price: "See listing",
-    platforms: [platform],
-    platformIcon: icon,
-    bookingLinks: { [platform]: row.event_url },
-    source: "real",
-    hobby: null,
-    day: null,
-    enrichTier: "saved",
-  };
-}
-
-function mergeSavedWithDetails(savedRows, detailEvents) {
-  const byUrl = new Map();
-  for (const ev of detailEvents || []) {
-    const url = primaryBookingLink(ev);
-    if (!url) continue;
-    if (!byUrl.has(url)) byUrl.set(url, []);
-    byUrl.get(url).push(ev);
-  }
-
-  const events = [];
-  const savedUrls = [];
-
-  for (const row of savedRows) {
-    const key = `${row.event_url}|${row.month}|${row.year}`;
-    savedUrls.push(key);
-
-    const matches = byUrl.get(row.event_url);
-    if (matches && matches.length > 0) {
-      events.push(...matches);
-    } else {
-      events.push(stubFromSavedRow(row));
-    }
-  }
-
-  return { events, savedUrls };
-}
+import {
+  stubFromSavedRow,
+  mergeSavedWithDetails,
+  validateSavedEventWrite,
+} from "../../../lib/savedEventCity";
 
 export default async function handler(req, res) {
   const { user, reason } = await getUserFromRequestDetailed(req);
@@ -103,10 +62,13 @@ export default async function handler(req, res) {
       status = "interested",
       eventName = null,
       platform = null,
+      normalizedCity = null,
+      venue = null,
     } = req.body || {};
 
-    if (!eventUrl || typeof month !== "number" || typeof year !== "number") {
-      return res.status(400).json({ error: "eventUrl, month, and year are required" });
+    const validation = validateSavedEventWrite({ eventUrl, month, year, normalizedCity });
+    if (!validation.ok) {
+      return res.status(validation.status).json({ error: validation.error });
     }
 
     await ensureProfile(supabase, user);
@@ -120,6 +82,8 @@ export default async function handler(req, res) {
         status,
         event_name: eventName,
         platform,
+        venue,
+        normalized_city: normalizedCity,
       },
       { onConflict: "user_id,event_url,month,year" }
     );

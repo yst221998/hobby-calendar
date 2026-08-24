@@ -1,5 +1,7 @@
 import styles from './SavedEventsPanel.module.css'
 
+const { getCityLabel } = require('../lib/eventCity')
+
 export default function SavedEventsPanel({ events, onEventClick, onClose }) {
   return (
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -29,7 +31,7 @@ export default function SavedEventsPanel({ events, onEventClick, onClose }) {
                   <div className={styles.info}>
                     <p className={styles.name}>{ev.name}</p>
                     <p className={styles.meta}>
-                      {ev.hobby} · {ev.platforms?.[0]} · {ev.day ? `Day ${ev.day}` : 'Date TBD'}
+                      {getCityLabel(ev.normalizedCity) || 'Location not verified'} · {ev.hobby} · {ev.platforms?.[0]} · {ev.day ? `Day ${ev.day}` : 'Date TBD'}
                     </p>
                   </div>
                   <span className={styles.arrow}>→</span>
