@@ -13,15 +13,21 @@ create table if not exists events (
   price text,
   hobby text,
   enrich_tier text,
+  normalized_city text not null,
   event_payload jsonb,
   updated_at timestamptz not null default now(),
-  primary key (url, month, year)
+  primary key (url, month, year),
+  constraint events_normalized_city_check
+    check (normalized_city in ('mumbai', 'navi_mumbai', 'thane'))
 );
+
+create index if not exists events_month_year_hobby_city_idx
+  on events (month, year, hobby, normalized_city);
 
 create table if not exists search_cache (
   cache_key text primary key,
   hobbies jsonb not null,
-  city text not null default 'Mumbai',
+  city text not null default '', -- preferred area; not the verified event city
   month int not null,
   year int not null,
   event_urls jsonb not null default '[]',
@@ -57,7 +63,7 @@ create table if not exists profiles (
 create table if not exists user_preferences (
   user_id uuid primary key references auth.users(id) on delete cascade,
   hobbies jsonb not null default '[]',
-  city text not null default 'Mumbai',
+  city text not null default '', -- preferred area; not the verified event city
   default_month int,
   default_year int,
   updated_at timestamptz not null default now()
@@ -72,13 +78,19 @@ create table if not exists saved_events (
   status text not null default 'interested',
   event_name text,
   platform text,
+  venue text,
+  normalized_city text,
   created_at timestamptz not null default now(),
-  unique (user_id, event_url, month, year)
+  unique (user_id, event_url, month, year),
+  constraint saved_events_normalized_city_check
+    check (normalized_city is null or normalized_city in ('mumbai', 'navi_mumbai', 'thane'))
 );
 
--- If saved_events already exists without name/platform, run:
+-- If saved_events already exists without name/platform/city, run:
 -- alter table saved_events add column if not exists event_name text;
 -- alter table saved_events add column if not exists platform text;
+-- alter table saved_events add column if not exists venue text;
+-- alter table saved_events add column if not exists normalized_city text;
 
 create index if not exists saved_events_user_id_idx
   on saved_events (user_id, created_at desc);

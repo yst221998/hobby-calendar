@@ -111,14 +111,29 @@
   border: none;
   text-align: left;
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-family: 'DM Sans', sans-serif;
   transition: opacity 0.1s;
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+}
+
+.eventCity {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.01em;
+}
+
+.eventName {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eventPill:hover { opacity: 0.8; }

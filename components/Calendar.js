@@ -1,5 +1,8 @@
 import styles from './Calendar.module.css'
 
+const { getCityLabel } = require('../lib/eventCity')
+const { eventTooltip } = require('../lib/eventDisplay')
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -74,9 +77,11 @@ export default function Calendar({ events, month, year, onMonthChange, onEventCl
                   <button
                     key={ei}
                     className={`${styles.eventPill} ${styles[getColor(ev.hobby)]}`}
+                    title={eventTooltip(ev)}
                     onClick={() => onEventClick(ev)}
                   >
-                    {ev.name.length > 20 ? ev.name.slice(0, 18) + '…' : ev.name}
+                    <span className={styles.eventCity}>{getCityLabel(ev.normalizedCity) || 'Unverified'}</span>
+                    <span className={styles.eventName}>{ev.name}</span>
                   </button>
                 ))}
                 {dayEvents.length > 2 && (

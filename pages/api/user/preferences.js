@@ -28,16 +28,18 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message });
     }
 
+    const preferredArea = data?.city && data.city !== "Mumbai" ? data.city : "";
     return res.status(200).json({
       hobbies: data?.hobbies || [],
-      city: data?.city || "Mumbai",
+      city: data?.city || "",
+      preferredArea,
       defaultMonth: data?.default_month ?? null,
       defaultYear: data?.default_year ?? null,
     });
   }
 
   if (req.method === "POST") {
-    const { hobbies, city = "Mumbai", month, year } = req.body || {};
+    const { hobbies, city, preferredArea, month, year } = req.body || {};
 
     if (!Array.isArray(hobbies)) {
       return res.status(400).json({ error: "hobbies must be an array" });
@@ -47,12 +49,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Cannot save empty hobbies" });
     }
 
+    const area = typeof (preferredArea ?? city) === "string" ? (preferredArea ?? city) : "";
+    const storedArea = area === "Mumbai" ? "" : area.trim();
+
     await ensureProfile(supabase, user);
 
     const row = {
       user_id: user.id,
       hobbies,
-      city: city || "Mumbai",
+      city: storedArea,
       default_month: typeof month === "number" ? month : null,
       default_year: typeof year === "number" ? year : null,
       updated_at: new Date().toISOString(),
@@ -66,7 +71,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message });
     }
 
-    return res.status(200).json({ ok: true, hobbies, city: row.city });
+    return res.status(200).json({ ok: true, hobbies, city: row.city, preferredArea: row.city });
   }
 
   return res.status(405).json({ error: "Method not allowed" });

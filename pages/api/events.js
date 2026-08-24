@@ -3,11 +3,17 @@ import { getEventsWithCache } from "../../lib/cache";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { hobbies, city = "Mumbai", month, year, debug: includeDebug = false } = req.body;
+  const { hobbies, city = "Mumbai", month, year, debug: includeDebug = false, preferredArea } = req.body || {};
 
   if (!hobbies || hobbies.length === 0) {
     return res.status(400).json({ error: "Please provide at least one hobby" });
   }
+
+  const area = typeof (preferredArea ?? city) === "string" ? (preferredArea ?? city) : "";
+  if (area.length > 80) {
+    return res.status(400).json({ error: "preferredArea is too long" });
+  }
+  const normalizedPreferredArea = area === "Mumbai" ? "" : area.trim();
 
   if (!process.env.SERPAPI_KEY) {
     return res.status(400).json({ error: "SERPAPI_KEY is not set. Add it to .env.local" });
@@ -15,7 +21,7 @@ export default async function handler(req, res) {
 
   try {
     const { events, scheduled, unscheduled, fromCache, cacheAgeMs, debug } =
-      await getEventsWithCache(hobbies, city, month, year);
+      await getEventsWithCache(hobbies, normalizedPreferredArea, month, year);
 
     const payload = {
       events,
