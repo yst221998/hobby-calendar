@@ -10,6 +10,8 @@ import { getSupabaseBrowserClient, isBrowserSupabaseConfigured } from '../lib/su
 import { userApiFetch, getEventUrl } from '../lib/userApi'
 import styles from './index.module.css'
 
+const { saveGuestDraft, readGuestDraft, clearGuestDraft } = require('../lib/guestDraft')
+
 const STEPS = { INPUT: 'input', LOADING: 'loading', CALENDAR: 'calendar' }
 
 const LOADING_MSGS = [
@@ -89,7 +91,7 @@ export default function Home() {
   }, [buildCacheKey])
 
   const savePreferences = useCallback(async (token, hobbyList, city, m, y) => {
-    if (!token || hobbyList.length === 0) return
+    if (!token || hobbyList.length === 0) return { ok: false, error: null }
     try {
       await userApiFetch('/api/user/preferences', token, {
         method: 'POST',
@@ -100,8 +102,10 @@ export default function Home() {
           year: y,
         }),
       })
+      return { ok: true, error: null }
     } catch (e) {
       console.error('Could not save preferences:', e.message)
+      return { ok: false, error: e }
     }
   }, [])
 
@@ -147,42 +151,62 @@ export default function Home() {
     }
   }, [buildCacheKey, fetchEvents])
 
-  const applySignedInSession = useCallback(async (session, options = {}) => {
+  const applySignedInSession = useCallback(async (session) => {
     if (!session?.access_token) return
 
-    const { isGuestMerge = false } = options
+    setError('')
     const token = session.access_token
-    const currentHobbies = hobbiesRef.current
-    const currentLocation = locationRef.current
+    const draft = readGuestDraft()
     const currentMonth = monthRef.current
     const currentYear = yearRef.current
 
     // Always load saved events from the account
     await loadSavedEvents(token)
 
-    // Guest → sign-in with hobbies already picked: save those onto the account
-    if (isGuestMerge && currentHobbies.length > 0) {
-      await savePreferences(token, currentHobbies, currentLocation || 'Mumbai', currentMonth, currentYear)
-    }
+    if (draft?.hobbies?.length) {
+      setHobbies(draft.hobbies)
+      setLocation(draft.location || '')
+      setMonth(draft.month)
+      setYear(draft.year)
 
-    // Always restore preferences from the account (source of truth)
-    try {
-      const prefs = await userApiFetch('/api/user/preferences', token)
-      if (prefs.hobbies?.length) {
-        setHobbies(prefs.hobbies)
-        setLocation(prefs.city === 'Mumbai' ? '' : prefs.city || '')
-
-        const m = typeof prefs.defaultMonth === 'number' ? prefs.defaultMonth : currentMonth
-        const y = typeof prefs.defaultYear === 'number' ? prefs.defaultYear : currentYear
-        setMonth(m)
-        setYear(y)
-
-        // Always rebuild calendar from saved hobbies on restore / guest merge
-        await runCalendarLoad(prefs.hobbies, prefs.city || 'Mumbai', m, y)
+      const saveResult = await savePreferences(
+        token,
+        draft.hobbies,
+        draft.location || 'Mumbai',
+        draft.month,
+        draft.year
+      )
+      if (saveResult.ok) {
+        clearGuestDraft()
+      } else if (saveResult.error) {
+        setError(saveResult.error.message || 'Could not save your hobbies to this account.')
       }
-    } catch (e) {
-      console.error('Could not load preferences:', e.message)
-      setError(e.message || 'Could not load your saved hobbies.')
+
+      await runCalendarLoad(
+        draft.hobbies,
+        draft.location || 'Mumbai',
+        draft.month,
+        draft.year
+      )
+    } else {
+      // With no guest draft, the account remains the source of truth.
+      try {
+        const prefs = await userApiFetch('/api/user/preferences', token)
+        if (prefs.hobbies?.length) {
+          setHobbies(prefs.hobbies)
+          setLocation(prefs.city === 'Mumbai' ? '' : prefs.city || '')
+
+          const m = typeof prefs.defaultMonth === 'number' ? prefs.defaultMonth : currentMonth
+          const y = typeof prefs.defaultYear === 'number' ? prefs.defaultYear : currentYear
+          setMonth(m)
+          setYear(y)
+
+          await runCalendarLoad(prefs.hobbies, prefs.city || 'Mumbai', m, y)
+        }
+      } catch (e) {
+        console.error('Could not load preferences:', e.message)
+        setError('Could not load your saved hobbies — try Sign out and a new magic link.')
+      }
     }
 
     const pending = pendingSaveRef.current
@@ -229,7 +253,7 @@ export default function Home() {
       }
     }
 
-    const bootstrapSession = async (session, isGuestMerge = false) => {
+    const bootstrapSession = async (session) => {
       if (!active || !session?.access_token) return
       setUser(session.user)
       setAccessToken(session.access_token)
@@ -238,7 +262,7 @@ export default function Home() {
       if (!bootstrapped) {
         bootstrapped = true
         sessionHandledRef.current = true
-        await applySignedInSession(session, { isGuestMerge })
+        await applySignedInSession(session)
       } else {
         await loadSavedEvents(session.access_token)
       }
@@ -246,7 +270,7 @@ export default function Home() {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       // Refresh / returning visit — restore account, not guest merge
-      if (session) await bootstrapSession(session, false)
+      if (session) await bootstrapSession(session)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -264,11 +288,10 @@ export default function Home() {
             sessionHandledRef.current = true
             bootstrapped = true
             // SIGNED_IN after magic link with hobbies in memory = guest merge
-            const isGuestMerge = event === 'SIGNED_IN' && hadGuestHobbies
-            await applySignedInSession(session, { isGuestMerge })
+            await applySignedInSession(session)
           } else if (event === 'SIGNED_IN') {
             if (hadGuestHobbies) {
-              await applySignedInSession(session, { isGuestMerge: true })
+              await applySignedInSession(session)
             } else {
               await loadSavedEvents(session.access_token)
             }
@@ -295,6 +318,14 @@ export default function Home() {
   const handleSendMagicLink = async (email) => {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) throw new Error('Sign-in is not configured yet.')
+    if (hobbiesRef.current.length > 0) {
+      saveGuestDraft({
+        hobbies: hobbiesRef.current,
+        location: locationRef.current,
+        month: monthRef.current,
+        year: yearRef.current,
+      })
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -323,15 +354,18 @@ export default function Home() {
   const handleToggleSave = async () => {
     if (!selectedEvent) return
 
+    const eventUrl = getEventUrl(selectedEvent)
+    if (!eventUrl) {
+      setError('This event has no booking link, so it cannot be saved.')
+      return
+    }
+
     if (!accessToken) {
       setPendingSaveEvent(selectedEvent)
       setAuthMessage('Sign in to save events you are interested in.')
       setShowAuthModal(true)
       return
     }
-
-    const eventUrl = getEventUrl(selectedEvent)
-    if (!eventUrl) return
 
     const saveKey = `${eventUrl}|${month}|${year}`
     const currentlySaved = savedUrlSet.has(saveKey)
@@ -393,6 +427,7 @@ export default function Home() {
     if (hobbies.length === 0) { setError('Please pick at least one hobby.'); return }
     setError('')
     setMonthError('')
+    saveGuestDraft({ hobbies, location, month, year })
     setStep(STEPS.LOADING)
 
     let msgIndex = 0
@@ -413,7 +448,9 @@ export default function Home() {
       setStep(STEPS.CALENDAR)
 
       if (accessToken) {
-        await savePreferences(accessToken, hobbies, location || 'Mumbai', month, year)
+        const saveResult = await savePreferences(accessToken, hobbies, location || 'Mumbai', month, year)
+        if (saveResult.ok) clearGuestDraft()
+        else if (saveResult.error) setError(saveResult.error.message || 'Could not save your hobbies.')
       }
     } catch (e) {
       clearInterval(interval)
@@ -445,7 +482,9 @@ export default function Home() {
       setEventSources(['BookMyShow', 'District'])
 
       if (accessToken) {
-        await savePreferences(accessToken, hobbies, location || 'Mumbai', m, y)
+        const saveResult = await savePreferences(accessToken, hobbies, location || 'Mumbai', m, y)
+        if (saveResult.ok) clearGuestDraft()
+        else if (saveResult.error) setMonthError(saveResult.error.message || 'Could not save this month.')
       }
     } catch (e) {
       setMonthError(e.message || 'Failed to load events for this month.')
